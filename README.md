@@ -1,6 +1,26 @@
 # 회의실 예약 프로젝트
 
-개발 전 폴더 구조를 정리한 상태다. 백엔드는 FastAPI, DB는 PostgreSQL을 사용하며 Supabase는 사용하지 않는다. 구현·패키지 설치·DB 생성은 아직 수행하지 않았다.
+백엔드는 FastAPI, DB는 PostgreSQL을 사용하며 Supabase는 사용하지 않는다. 애플리케이션은 개발 전 폴더 구조를 정리한 상태이며, 로컬 PostgreSQL 실행 설정은 준비되어 있다.
+
+## 로컬 PostgreSQL 실행
+
+처음 설정할 때 프로젝트 루트에서 환경변수 예시 파일을 복사한다.
+
+```bash
+cp .env.example .env
+```
+
+루트 `.env`에서 `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`를 설정한 뒤 실행한다.
+
+```bash
+docker compose up -d
+```
+
+Docker Compose는 루트 `.env`를 자동으로 읽는다. 필수 변수가 없거나 비어 있으면 실행 시 오류가 발생한다. 터미널에 같은 환경변수가 설정되어 있으면 터미널 값이 우선한다. `backend/.env`는 이 설정에 사용하지 않는다.
+
+예시 설정의 접속 주소는 `localhost:5433`이다. `POSTGRES_PORT`는 호스트 접속 포트이며 컨테이너 내부 포트는 `5432`로 고정된다. `.env`는 Git에서 제외하고, 팀에 공유할 변수 목록은 `.env.example`에서 관리한다.
+
+데이터는 Docker 볼륨에 보존된다. DB 이름·계정·비밀번호는 볼륨 초기화 시 적용되므로, 이미 생성된 DB는 `.env` 수정만으로 변경되지 않는다.
 
 ## 폴더 구조
 
@@ -8,7 +28,7 @@
 project2/
 ├── README.md                    # 프로젝트 안내와 파일 위치
 ├── .gitignore                   # Git 제외 규칙 작성 예정
-├── compose.yaml                 # 로컬 PostgreSQL 실행 설정 작성 예정
+├── compose.yaml                 # 로컬 PostgreSQL 실행 설정
 ├── docs/
 │   ├── design/                  # 구조·ERD·인증·설계 결정
 │   └── collaboration/           # 실행 방법·작업 분담·API 약속
