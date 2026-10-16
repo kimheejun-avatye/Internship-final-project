@@ -22,6 +22,17 @@ Docker Compose는 루트 `.env`를 자동으로 읽는다. 필수 변수가 없�
 
 데이터는 Docker 볼륨에 보존된다. DB 이름·계정·비밀번호는 볼륨 초기화 시 적용되므로, 이미 생성된 DB는 `.env` 수정만으로 변경되지 않는다.
 
+## DB 마이그레이션
+
+루트 `.env` 설정 및 PostgreSQL 기동 후 실행한다. Python 3.9 이상이 필요하다.
+
+```bash
+bash backend/scripts/migrate.sh
+```
+
+스크립트가 전용 가상환경과 의존성을 준비하고 Alembic 마이그레이션을 적용한다.
+[ERD 및 마이그레이션 실행 안내](docs/design/database.md)에서 테이블별 컬럼과 제약, 실행 방법을 확인할 수 있다.
+
 ## 폴더 구조
 
 ```text
