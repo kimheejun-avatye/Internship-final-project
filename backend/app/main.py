@@ -1,7 +1,15 @@
 from fastapi import FastAPI
 
-app = FastAPI()
+from app.api.routes import auth
+from app.core.config import settings
+
+if not settings.secret_key:
+    raise RuntimeError("Set SECRET_KEY in root .env")
+
+app = FastAPI(title="Meeting Room API")
+app.include_router(auth.router)
+
 
 @app.get("/health")
-async def health():
+def health():
     return {"status": "ok"}
