@@ -18,9 +18,9 @@ def upgrade():
     op.execute("ALTER TYPE user_team RENAME TO team_type")
     op.execute("ALTER TYPE user_role RENAME TO role_type")
 
-    # 기존 행이 있어도 NOT NULL 컬럼을 추가할 수 있도록 임시 기본값을 쓴다
-    op.add_column("users", sa.Column("name", sa.Text(), nullable=False, server_default=""))
-    op.alter_column("users", "name", server_default=None)
+    # 0001 에 name 이 이미 있으면(최신 0001) 건너뛴다. 예전 0001 로 만든 DB 에는 임시 기본값으로 추가한다
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT ''")
+    op.execute("ALTER TABLE users ALTER COLUMN name DROP DEFAULT")
     op.add_column("users", sa.Column("birth_date", sa.Date(), nullable=True))
     op.add_column("users", sa.Column("phone", sa.Text(), nullable=True))
     op.add_column("users", sa.Column("approved_at", sa.DateTime(timezone=True), nullable=True))
@@ -103,7 +103,7 @@ def downgrade():
             type_=sa.DateTime(timezone=False),
             postgresql_using=f"{column} AT TIME ZONE 'UTC'",
         )
-    for column in ("approved_at", "phone", "birth_date", "name"):
+    for column in ("approved_at", "phone", "birth_date"):  # name 은 0001 소유이므로 남긴다
         op.drop_column("users", column)
 
     op.execute("ALTER TYPE role_type RENAME TO user_role")
