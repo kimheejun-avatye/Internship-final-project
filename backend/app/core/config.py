@@ -1,0 +1,62 @@
+# 환경변수 설정. 루트 .env 를 읽는다. 수치는 모두 환경변수로 조정할 수 있다
+
+import ipaddress
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+from sqlalchemy import URL
+
+load_dotenv(Path(__file__).resolve().parents[3] / ".env", override=False)
+
+
+def _int(name: str, default: int) -> int:
+    return int(os.environ.get(name, default))
+
+
+class Settings:
+    def __init__(self) -> None:
+        self.secret_key = os.environ.get("SECRET_KEY", "")
+        self.company_ips = os.environ.get("COMPANY_IPS", "127.0.0.1,::1")
+
+        self.smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+        self.smtp_port = _int("SMTP_PORT", 587)
+        self.smtp_user = os.environ.get("SMTP_USER", "")
+        # Gmail 앱 비밀번호는 4자리씩 공백으로 나뉘어 표시되므로 공백은 제거한다
+        self.smtp_password = os.environ.get("SMTP_PASSWORD", "").replace(" ", "")
+
+        self.code_ttl_seconds = _int("CODE_TTL_SECONDS", 300)
+        self.resend_cooldown_seconds = _int("RESEND_COOLDOWN_SECONDS", 60)
+        self.email_hourly_limit = _int("EMAIL_HOURLY_LIMIT", 5)
+        self.ip_hourly_send_limit = _int("IP_HOURLY_SEND_LIMIT", 60)
+        self.ip_minute_send_limit = _int("IP_MINUTE_SEND_LIMIT", 20)
+        self.ip_hourly_check_limit = _int("IP_HOURLY_CHECK_LIMIT", 90)
+        self.service_daily_send_limit = _int("SERVICE_DAILY_SEND_LIMIT", 400)
+        self.max_failed_attempts = _int("MAX_FAILED_ATTEMPTS", 5)
+        self.lock_seconds = _int("LOCK_SECONDS", 900)
+        self.signup_token_ttl_seconds = _int("SIGNUP_TOKEN_TTL_SECONDS", 900)
+
+    @property
+    def database_url(self) -> URL:
+        return URL.create(
+            "postgresql+psycopg",
+            username=os.environ["POSTGRES_USER"],
+            password=os.environ["POSTGRES_PASSWORD"],
+            host="127.0.0.1",
+            port=int(os.environ["POSTGRES_PORT"]),
+            database=os.environ["POSTGRES_DB"],
+        )
+
+    def is_company_ip(self, ip: str) -> bool:
+        try:
+            addr = ipaddress.ip_address(ip)
+        except ValueError:
+            return False
+        for item in self.company_ips.split(","):
+            item = item.strip()
+            if item and addr in ipaddress.ip_network(item, strict=False):
+                return True
+        return False
+
+
+settings = Settings()
