@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.routes import auth, rooms
+from app.api.routes import admin, auth, rooms
 from app.core.config import settings
 
 if not settings.secret_key:
@@ -9,6 +9,7 @@ if not settings.secret_key:
 app = FastAPI(title="Meeting Room API")
 app.include_router(auth.router)
 app.include_router(rooms.router)
+app.include_router(admin.router)
 
 
 @app.get("/health")

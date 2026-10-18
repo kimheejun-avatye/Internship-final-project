@@ -48,7 +48,7 @@ def clean():
     yield
     with engine.begin() as c:
         c.execute(text(
-            "TRUNCATE rooms, users, email_verifications, "
+            "TRUNCATE room_blocks, rooms, users, email_verifications, "
             "email_send_log, signup_check_log"
         ))
 
