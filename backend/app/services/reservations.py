@@ -3,8 +3,13 @@
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.models.reservation_attendee import ReservationAttendee
+from app.models.reservations import Reservation
+from app.models.rooms import Room
+from app.schemas.reservations import CalendarQuery, CalendarReservationResponse
 from app.schemas.rooms import RoomOut
 
 
@@ -23,24 +28,71 @@ class ReservationService:
         self.db = db
 
     # 캘린더 예약 조회: 기간 겹침·생성자·회의실 조건으로 예약과 참석 정보를 구성한다.
-    def get_calendar_reservations(self, user_id: UUID, query: Any) -> list[Any]:
-        """캘린더의 일·주·월 공통 조회. 페이지네이션 없이 예약 DTO 목록 반환.
+    def get_calendar_reservations(
+        self, user_id: UUID, query: CalendarQuery
+    ) -> list[CalendarReservationResponse]:
+        """조회 기간·범위·회의실 조건에 맞는 캘린더 예약 목록을 반환한다.
 
-        TODO: CalendarQuery/CalendarReservationResponse가 실제로 정의되면
-        Any를 해당 DTO와 list[CalendarReservationResponse]로 교체한다.
-        요청 계약: 시간대가 있는 start_at/end_at, end_at > start_at,
-        scope=all/mine, 선택적 room_id.
-        응답 항목: reservation_id, title, room_id, room_name, organizer_id,
-        start_at, end_at, participant_count, is_mine, is_attending.
-        TODO: [start_at, end_at)과 겹치는 예약의 조건을 향후 리포지토리에 전달:
-        reservation.start_at < query.end_at 및 reservation.end_at > query.start_at.
-        TODO: scope=mine은 Reservation.user_id == user_id(생성자)로 제한하고,
-        all은 생성자로 제한하지 않는다. 선택적 회의실 조건도 함께 전달한다.
-        TODO: 회의실 이름, ReservationAttendee 기반 참석 인원수·내 참석 여부 조회.
-        기존 Reservation.participants 값으로 참석 인원수를 대신하지 않는다.
-        TODO: 생성자로 is_mine을 계산하고 응답 DTO 구성. is_attending은 별도다.
+        회의실 이름, 참석 인원수, 내 예약 여부와 내 참석 여부를 포함한다.
         """
-        raise NotImplementedError
+        # 참석 인원은 참석자 테이블에서 계산하며, 참석자가 없어도 0을 반환한다.
+        participant_count = (
+            select(func.count())
+            .select_from(ReservationAttendee)
+            .where(ReservationAttendee.reservation_id == Reservation.reservation_id)
+            .correlate(Reservation)
+            .scalar_subquery()
+        )
+
+        # 생성자 여부와 독립적으로 로그인 사용자의 실제 참석 등록 여부를 확인한다.
+        is_attending = (
+            select(ReservationAttendee.user_id)
+            .where(
+                ReservationAttendee.reservation_id == Reservation.reservation_id,
+                ReservationAttendee.user_id == user_id,
+            )
+            .correlate(Reservation)
+            .exists()
+        )
+
+        # 기본 기간 조건에 사용자 선택 조건을 추가한다. 이 단계에서는 실행하지 않는다.
+        statement = (
+            select(
+                Reservation,
+                Room.name.label("room_name"),
+                participant_count.label("participant_count"),
+                is_attending.label("is_attending"),
+            )
+            .join(Room, Room.room_id == Reservation.room_id)
+            .where(
+                Reservation.start_at < query.end_at,
+                Reservation.end_at > query.start_at,
+            )
+        )
+        if query.scope == "mine":
+            statement = statement.where(Reservation.user_id == user_id)
+        if query.room_id is not None:
+            statement = statement.where(Reservation.room_id == query.room_id)
+
+        statement = statement.order_by(Reservation.start_at, Reservation.reservation_id)
+
+        # 예약 외 여러 열을 함께 받으므로 scalars 대신 execute로 한 번에 조회한다.
+        rows = self.db.execute(statement).all()
+        return [
+            CalendarReservationResponse(
+                reservation_id=reservation.reservation_id,
+                title=reservation.title,
+                room_id=reservation.room_id,
+                room_name=room_name,
+                organizer_id=reservation.user_id,
+                start_at=reservation.start_at,
+                end_at=reservation.end_at,
+                participant_count=count,
+                is_mine=reservation.user_id == user_id,
+                is_attending=attending,
+            )
+            for reservation, room_name, count, attending in rows
+        ]
 
     # 회의실 목록 조회
     def get_calendar_rooms(self) -> list[RoomOut]:
