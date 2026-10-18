@@ -177,7 +177,9 @@ class ReservationService:
         RoomOut은 room_id/name 외 status/capacity도 포함한다.
         TODO: BLOCK 회의실 표시 여부는 제품 정책 확인 후 결정한다.
         """
-        raise NotImplementedError
+        # 기존 회의실 목록과 동일하게 상태로 제외하지 않고 이름·ID 순으로 제공한다.
+        rooms = self.db.scalars(select(Room).order_by(Room.name, Room.room_id)).all()
+        return [RoomOut.model_validate(room) for room in rooms]
 
     # 선택한 회의실의 오늘 남은 예약을 예약자 구분 없이 5건씩 조회한다.
     def get_my_today_reservations(
