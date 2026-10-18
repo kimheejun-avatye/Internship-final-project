@@ -25,6 +25,6 @@ export default function App() {
         <Route path="/profile" element={<ProfilePage />} />
       </Route>
     </Route>
-    <Route path="*" element={<Navigate to="/calendar" replace />} />
+    <Route path="*" element={<Navigate to="/reservations" replace />} />
   </Routes>;
 }

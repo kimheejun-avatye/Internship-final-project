@@ -24,7 +24,7 @@ npm ci
 npm run dev -- --host 127.0.0.1 --port 5174
 ```
 
-/login은 로그인, /password/reset은 비밀번호 찾기, /profile은 비밀번호 변경 화면이다. 로그인 성공과 기존 로그인 복원 후 기본 이동은 /calendar다. /signup은 기존 담당자 화면을 그대로 사용한다. 최신 developer의 예약·캘린더·관리자 화면은 ProtectedRoute와 팀 AppLayout 아래에 연결했다. 팀 화면의 임시 데이터는 유지한다.
+/login은 로그인, /password/reset은 비밀번호 찾기, /profile은 비밀번호 변경 화면이다. 로그인 성공과 기존 로그인 복원 후 기본 이동은 /reservations다. /signup은 기존 담당자 화면을 그대로 사용한다. 최신 developer의 예약·캘린더·관리자 화면은 ProtectedRoute와 팀 AppLayout 아래에 연결했다. 팀 화면의 임시 데이터는 유지한다.
 
 회원가입은 기존대로 승인 대기 계정을 만든다. 승인 기능은 담당자가 처리하며 로그인 코드는 approved_at·blocked_at 결과만 읽는다. 승인 CLI나 이름 수정 API는 이번 범위에 없다.
 

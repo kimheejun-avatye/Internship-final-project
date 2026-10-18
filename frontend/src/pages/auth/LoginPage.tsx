@@ -16,7 +16,7 @@ export default function LoginPage() {
     setBusy(true); setError("");
     try {
       await login(email.trim().toLowerCase(), password);
-      navigate("/calendar", { replace: true });
+      navigate("/reservations", { replace: true });
     } catch (e) {
       const wait = e instanceof ApiError && e.extra.retryAfter ? ` ${Math.ceil(e.extra.retryAfter / 60)}분 후 다시 시도해주세요.` : "";
       setError((e instanceof Error ? e.message : "로그인에 실패했습니다.") + wait);

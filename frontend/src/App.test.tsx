@@ -26,20 +26,20 @@ it("logs out through the server and returns to login", async () => {
 });
 
 
-it("sends an existing session from login to the calendar", async () => {
+it("sends an existing session from login to reservations", async () => {
   vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify(session),{status:200})));
   render(<MemoryRouter initialEntries={["/login"]}><AuthProvider><App /></AuthProvider></MemoryRouter>);
-  expect(await screen.findByRole("heading",{name:"예약 캘린더"})).toBeInTheDocument();
+  expect(await screen.findByRole("heading",{name:"회의실 예약"})).toBeInTheDocument();
 });
 
-it("sends a successful login to the calendar even with an earlier profile destination", async () => {
+it("sends a successful login to reservations even with an earlier profile destination", async () => {
   vi.stubGlobal("fetch",vi.fn(async(path: string)=>path.endsWith("/login") ? new Response(JSON.stringify(session),{status:200}) : new Response(JSON.stringify({detail:{code:"SESSION_REQUIRED"}}),{status:401})));
   render(<MemoryRouter initialEntries={[{pathname:"/login",state:{from:"/profile"}}]}><AuthProvider><App /></AuthProvider></MemoryRouter>);
   const user=userEvent.setup();
   await user.type(await screen.findByLabelText("아이디"),"member@example.com");
   await user.type(screen.getByLabelText("비밀번호"),"Example123!");
   await user.click(screen.getByRole("button",{name:"로그인"}));
-  expect(await screen.findByRole("heading",{name:"예약 캘린더"})).toBeInTheDocument();
+  expect(await screen.findByRole("heading",{name:"회의실 예약"})).toBeInTheDocument();
 });
 
 it("requires login for direct calendar entry", async () => {

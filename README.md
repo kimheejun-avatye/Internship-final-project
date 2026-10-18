@@ -4,8 +4,8 @@
 
 ## 로그인 후 이동
 
-- 로그인 성공: 항상 /calendar로 이동한다.
-- 유효한 세션으로 /login 또는 /password/reset 접근: /calendar로 이동한다.
+- 로그인 성공: 항상 /reservations로 이동한다.
+- 유효한 세션으로 /login 또는 /password/reset 접근: /reservations로 이동한다.
 - 캘린더·예약·관리자·비밀번호 변경 화면은 ProtectedRoute와 팀 공통 AppLayout으로 연결한다.
 - 팀 메뉴의 로그아웃 버튼은 서버의 현재 세션 종료를 호출한다. 비밀번호 변경 메뉴는 /profile이다.
 - /signup은 기존 담당자의 화면·API·정책을 그대로 사용한다.
