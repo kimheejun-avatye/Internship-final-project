@@ -1,0 +1,7 @@
+.status-page { padding: 64px 24px; text-align: center; }
+.profile-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,320px),1fr)); gap: 24px; margin-top: 24px; align-items: start; }
+.profile-card { padding: 28px; }
+.profile-card h2 { font-size: 20px; }
+.notice { color: var(--muted); line-height: 1.6; margin: 20px 0; }
+.full-width { width: 100%; margin-top: 20px; }
+@media (max-width: 520px) { .account-header { padding: 16px; } .account-header nav { gap: 12px; } .auth-logo.large { margin-top: 32px; max-width: 85%; } }
