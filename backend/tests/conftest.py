@@ -30,6 +30,8 @@ from app.db.base import Base  # noqa: E402
 from app.db.session import engine  # noqa: E402
 from app.main import app  # noqa: E402
 import app.models as _models  # noqa: E402,F401
+from app.models.reservations import Reservation  # noqa: E402,F401
+from app.models.reservation_attendee import ReservationAttendee  # noqa: E402,F401
 from app.services import mailer  # noqa: E402
 
 
@@ -48,7 +50,7 @@ def clean():
     yield
     with engine.begin() as c:
         c.execute(text(
-            "TRUNCATE room_blocks, rooms, users, email_verifications, "
+            "TRUNCATE room_blocks, reservation_attendees, reservations, rooms, users, email_verifications, "
             "email_send_log, signup_check_log"
         ))
 
