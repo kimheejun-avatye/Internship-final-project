@@ -157,14 +157,14 @@ describe("AdminPage", () => {
     expect(calls.filter((c) => c === "GET /api/admin/rooms")).toHaveLength(2);
   });
 
-  it("로그인 연동 전에는 서버 안내 문구를 보여 준다", async () => {
-    const notReady = () => ({
-      status: 501,
-      body: { detail: { code: "AUTH_NOT_READY", message: "로그인 기능 연동 후 사용할 수 있습니다." } },
+  it("권한이 없으면 서버 안내 문구를 보여 준다", async () => {
+    const forbidden = () => ({
+      status: 403,
+      body: { detail: { code: "ADMIN_REQUIRED", message: "관리자만 사용할 수 있습니다." } },
     });
-    mockApi({ "GET /api/admin/users": notReady, "GET /api/admin/rooms": notReady });
+    mockApi({ "GET /api/admin/users": forbidden, "GET /api/admin/rooms": forbidden });
     render(<AdminPage />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("로그인 기능 연동 후 사용할 수 있습니다.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("관리자만 사용할 수 있습니다.");
   });
 });

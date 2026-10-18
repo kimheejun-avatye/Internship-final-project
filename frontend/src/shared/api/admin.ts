@@ -1,5 +1,5 @@
-// 관리자 API. 로그인(codex/login) 머지 후에는 CSRF 헤더를 붙여 주는 session-client 의 request 로 바꾼다
-import { request } from "./client";
+// 관리자 API. session-client 가 로그인 세션의 CSRF 헤더를 붙여 준다
+import { request } from "./session-client";
 
 export type UserStatus = "PENDING" | "ACTIVE" | "BLOCKED";
 

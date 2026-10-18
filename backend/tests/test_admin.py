@@ -2,9 +2,11 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from conftest import PASSWORD, signin
 from sqlalchemy import select
 
 from app.api.admin_auth import current_admin
+from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.main import app
 from app.models.room_blocks import RoomBlock
@@ -54,11 +56,62 @@ def admin_user(monkeypatch):
     app.dependency_overrides.pop(current_admin, None)
 
 
-def test_admin_api_rejected_until_login_is_connected(client):
+def test_admin_api_requires_login(client):
     response = client.get("/api/admin/users")
 
-    assert response.status_code == 501
-    assert response.json()["detail"]["code"] == "AUTH_NOT_READY"
+    assert response.status_code == 401
+
+
+def test_member_cannot_use_admin_api(client, seed):
+    seed("member@example.com")
+    assert signin(client, "member@example.com").status_code == 200
+
+    response = client.get("/api/admin/users")
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "ADMIN_REQUIRED"
+
+
+def test_logged_in_admin_can_block_member(client, seed):
+    member_id = seed("member@example.com")
+    with SessionLocal() as db:
+        db.add(User(
+            email="admin@example.com",
+            name="관리자",
+            password_hash=hash_password(PASSWORD),
+            team=Team.AVATYE,
+            role=Role.ADMIN,
+            approved_at=NOW,
+        ))
+        db.commit()
+    assert signin(client, "admin@example.com").status_code == 200
+
+    # signin 이 CSRF 토큰 헤더를 붙여 두므로 POST 도 통과한다
+    response = client.post(f"/api/admin/users/{member_id}/block")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "BLOCKED"
+
+
+def test_admin_post_without_csrf_is_rejected(client, seed):
+    member_id = seed("member@example.com")
+    with SessionLocal() as db:
+        db.add(User(
+            email="admin@example.com",
+            name="관리자",
+            password_hash=hash_password(PASSWORD),
+            team=Team.AVATYE,
+            role=Role.ADMIN,
+            approved_at=NOW,
+        ))
+        db.commit()
+    signin(client, "admin@example.com")
+    del client.headers["X-CSRF-Token"]
+
+    response = client.post(f"/api/admin/users/{member_id}/block")
+
+    assert response.status_code == 403
+    assert get_user(member_id).blocked_at is None
 
 
 def test_list_users_shows_status(client, admin_user):
