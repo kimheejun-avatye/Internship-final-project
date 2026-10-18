@@ -1,0 +1,248 @@
+"""예약 생성과 트랜잭션, 실제 PostgreSQL 잠금 경합을 검증한다."""
+
+import os
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
+from queue import Queue
+from threading import Event
+from time import monotonic, sleep
+from types import SimpleNamespace
+from uuid import uuid4
+from zoneinfo import ZoneInfo
+
+import pytest
+from pydantic import ValidationError
+from sqlalchemy import event, func, select, text
+from sqlalchemy.exc import OperationalError
+
+from app.api.routes.reservation import ReservationController
+from app.core.exceptions import ApiError
+from app.db.session import SessionLocal, engine
+from app.models.reservation_attendee import ReservationAttendee
+from app.models.reservations import Reservation
+from app.models.rooms import Room, RoomStatus
+from app.models.users import Team, User
+from app.schemas.reservations import ReservationCreateIn, ReservationCreateOut
+from app.services import reservations as reservation_module
+from app.services.reservations import ReservationService
+
+
+@pytest.fixture
+def now(monkeypatch):
+    fixed = datetime(2026, 10, 18, 12, tzinfo=ZoneInfo("Asia/Seoul"))
+
+    class FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed.astimezone(tz) if tz else fixed.replace(tzinfo=None)
+
+    monkeypatch.setattr(reservation_module, "datetime", FrozenDatetime)
+    return fixed
+
+
+@pytest.fixture
+def db():
+    with SessionLocal() as session:
+        assert os.environ["POSTGRES_DB"].endswith("_test")
+        assert session.scalar(text("SELECT current_database()")) == os.environ["POSTGRES_DB"]
+        yield session
+        session.rollback()
+
+
+@pytest.fixture
+def sample(db, now):
+    user = User(email="creator@example.com", name="예약자", password_hash="unused", team=Team.AVATYE)
+    room = Room(name="생성 테스트 A회의실", capacity=6)
+    other_room = Room(name="생성 테스트 B회의실", capacity=6)
+    blocked_room = Room(name="차단 회의실", status=RoomStatus.BLOCK, capacity=6)
+    db.add_all([user, room, other_room, blocked_room])
+    db.commit()
+    return SimpleNamespace(user=user, room=room, other_room=other_room, blocked_room=blocked_room)
+
+
+def request_data(sample, now, **changes):
+    values = dict(room_id=sample.room.room_id, title="  팀 회의  ",
+                  start_at=now + timedelta(hours=1), end_at=now + timedelta(hours=2))
+    values.update(changes)
+    return ReservationCreateIn(**values)
+
+
+def test_controller_creates_and_commits_reservation(db, sample, now):
+    data = request_data(sample, now)
+    result = ReservationController(ReservationService(db)).create_reservation(data, sample.user)
+
+    assert isinstance(result, ReservationCreateOut)
+    assert result.room_id == sample.room.room_id
+    assert result.user_id == sample.user.user_id
+    assert result.title == "팀 회의"
+    assert (result.start_at, result.end_at) == (data.start_at, data.end_at)
+    assert result.created_at == now
+    # 다른 DB 세션에서도 보여야 저장이 확정된 것이다.
+    with SessionLocal() as observer:
+        saved = observer.get(Reservation, result.reservation_id)
+        assert saved is not None
+        assert (saved.title, saved.room_id, saved.user_id) == (result.title, result.room_id, result.user_id)
+        assert observer.scalar(select(func.count()).select_from(ReservationAttendee)) == 0
+    assert result.model_dump(mode="json")["reservation_id"] == str(result.reservation_id)
+
+
+@pytest.mark.parametrize("changes", [
+    {"title": ""}, {"title": " \t\n "}, {"room_id": "not-a-uuid"},
+    {"start_at": "2026-10-18T13:00:00"}, {"end_at": "2026-10-18T14:00:00"},
+    {"end_at": "2026-10-18T13:00:00+09:00"},
+    {"end_at": "2026-10-18T12:30:00+09:00"}, {"user_id": str(uuid4())},
+])
+def test_create_input_rejects_invalid_values(sample, now, changes):
+    with pytest.raises(ValidationError):
+        request_data(sample, now, **changes)
+
+
+def test_create_input_requires_title(sample, now):
+    with pytest.raises(ValidationError):
+        ReservationCreateIn(room_id=sample.room.room_id, start_at=now, end_at=now + timedelta(hours=1))
+
+
+@pytest.mark.parametrize("start_minutes,end_minutes", [(-1, 60), (-60, -30)])
+def test_past_start_is_rejected(db, sample, now, start_minutes, end_minutes):
+    data = request_data(sample, now, start_at=now + timedelta(minutes=start_minutes),
+                        end_at=now + timedelta(minutes=end_minutes))
+    with pytest.raises(ApiError) as caught:
+        ReservationService(db).create_reservation(sample.user.user_id, data)
+    assert caught.value.status_code == 400
+    assert caught.value.detail["code"] == "START_IN_PAST"
+    assert db.scalar(select(func.count()).select_from(Reservation)) == 0
+
+
+@pytest.mark.parametrize("problem,status,code", [
+    ("missing_room", 404, "ROOM_NOT_FOUND"),
+    ("blocked_room", 409, "ROOM_UNAVAILABLE"),
+    ("missing_user", 404, "USER_NOT_FOUND"),
+])
+def test_creation_business_errors(db, sample, now, problem, status, code):
+    room_id = (uuid4() if problem == "missing_room" else
+               sample.blocked_room.room_id if problem == "blocked_room" else sample.room.room_id)
+    user_id = uuid4() if problem == "missing_user" else sample.user.user_id
+    with pytest.raises(ApiError) as caught:
+        ReservationService(db).create_reservation(user_id, request_data(sample, now, room_id=room_id))
+    assert caught.value.status_code == status
+    assert caught.value.detail["code"] == code
+    assert db.scalar(select(func.count()).select_from(Reservation)) == 0
+
+
+@pytest.mark.parametrize("start_hours,end_hours,conflict", [
+    (1, 2, False), (3, 4, False), (1, 4, True), (2.25, 2.75, True),
+    (1.5, 2.5, True), (2.5, 3.5, True), (2, 3, True), (4, 5, False),
+])
+def test_overlap_and_adjacent_time_ranges(db, sample, now, start_hours, end_hours, conflict):
+    original = Reservation(room_id=sample.room.room_id, user_id=sample.user.user_id,
+                           title="기존 예약", start_at=now + timedelta(hours=2),
+                           end_at=now + timedelta(hours=3), created_at=now)
+    db.add(original)
+    db.commit()
+    data = request_data(sample, now, start_at=now + timedelta(hours=start_hours),
+                        end_at=now + timedelta(hours=end_hours))
+    if conflict:
+        with pytest.raises(ApiError) as caught:
+            ReservationService(db).create_reservation(sample.user.user_id, data)
+        assert caught.value.status_code == 409
+        assert caught.value.detail["code"] == "RESERVATION_CONFLICT"
+    else:
+        ReservationService(db).create_reservation(sample.user.user_id, data)
+    assert db.scalar(select(func.count()).select_from(Reservation)) == (1 if conflict else 2)
+    assert db.get(Reservation, original.reservation_id).title == "기존 예약"
+
+
+def test_same_time_in_another_room_is_allowed(db, sample, now):
+    service = ReservationService(db)
+    first = service.create_reservation(sample.user.user_id, request_data(sample, now))
+    second = service.create_reservation(sample.user.user_id,
+                                       request_data(sample, now, room_id=sample.other_room.room_id))
+    assert first.reservation_id != second.reservation_id
+    assert db.scalar(select(func.count()).select_from(Reservation)) == 2
+
+
+def test_timezone_offsets_are_compared_as_instants(db, sample, now):
+    service = ReservationService(db)
+    service.create_reservation(sample.user.user_id, request_data(sample, now))
+    utc_start = (now + timedelta(hours=1)).astimezone(timezone.utc)
+    data = request_data(sample, now, start_at=utc_start, end_at=utc_start + timedelta(hours=1))
+    with pytest.raises(ApiError) as caught:
+        service.create_reservation(sample.user.user_id, data)
+    assert caught.value.detail["code"] == "RESERVATION_CONFLICT"
+
+
+@pytest.mark.parametrize("failure_stage", ["flush", "response", "commit"])
+def test_failed_creation_rolls_back_and_session_is_reusable(db, sample, now, monkeypatch, failure_stage):
+    data = request_data(sample, now)
+    with monkeypatch.context() as patch:
+        if failure_stage == "flush":
+            original_flush = db.flush
+
+            def fail_after_insert(*args, **kwargs):
+                inserting = any(isinstance(row, Reservation) for row in db.new)
+                original_flush(*args, **kwargs)
+                if inserting:
+                    raise OperationalError("INSERT reservations", {}, RuntimeError("test failure"))
+
+            patch.setattr(db, "flush", fail_after_insert)
+        elif failure_stage == "response":
+            def fail_response(*args, **kwargs):
+                raise ValueError("test response failure")
+            patch.setattr(ReservationCreateOut, "model_validate", fail_response)
+        else:
+            def fail_commit():
+                raise OperationalError("COMMIT", {}, RuntimeError("test failure"))
+            patch.setattr(db, "commit", fail_commit)
+        with pytest.raises((OperationalError, ValueError)):
+            ReservationService(db).create_reservation(sample.user.user_id, data)
+    with SessionLocal() as observer:
+        assert observer.scalar(select(func.count()).select_from(Reservation)) == 0
+    result = ReservationService(db).create_reservation(sample.user.user_id, data)
+    assert db.get(Reservation, result.reservation_id) is not None
+
+
+def test_overlapping_concurrent_requests_create_only_one_row(sample, now):
+    first_locked, release_first = Event(), Event()
+    pids = Queue()
+    data = request_data(sample, now)
+    user_id = sample.user.user_id
+
+    def worker(first):
+        with SessionLocal() as session:
+            pid = session.scalar(text("SELECT pg_backend_pid()"))
+            pids.put((first, pid))
+            if first:
+                def pause_after_room_lock(conn, cursor, statement, parameters, context, executemany):
+                    if "FOR UPDATE" in statement:
+                        first_locked.set()
+                        if not release_first.wait(8):
+                            raise RuntimeError("test room-lock wait timed out")
+                event.listen(session.connection(), "after_cursor_execute", pause_after_room_lock)
+            try:
+                result = ReservationController(ReservationService(session)).create_reservation(
+                    data, session.get(User, user_id))
+                return "created", result.reservation_id
+            except ApiError as error:
+                return error.detail["code"], None
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(worker, True)
+        try:
+            assert first_locked.wait(5), "first request did not lock the room"
+            second = pool.submit(worker, False)
+            ids = dict([pids.get(timeout=5), pids.get(timeout=5)])
+            with engine.connect() as observer:
+                deadline = monotonic() + 5
+                while monotonic() < deadline:
+                    blockers = observer.scalar(text("SELECT pg_blocking_pids(:pid)"), {"pid": ids[False]})
+                    if ids[True] in blockers:
+                        break
+                    sleep(0.01)
+                else:
+                    pytest.fail("second request never waited for the first room lock")
+        finally:
+            release_first.set()
+        assert first.result(timeout=5)[0] == "created"
+        assert second.result(timeout=5)[0] == "RESERVATION_CONFLICT"
+    with SessionLocal() as observer:
+        assert observer.scalar(select(func.count()).select_from(Reservation)) == 1

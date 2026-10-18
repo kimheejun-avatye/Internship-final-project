@@ -9,13 +9,16 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.schemas.rooms import RoomOut
+from app.core.exceptions import ApiError
 from app.models.reservations import Reservation
-from app.models.rooms import Room
+from app.models.rooms import Room, RoomStatus
 from app.models.reservation_attendee import ReservationAttendee
 from app.models.users import User
 from app.schemas.reservations import (
     CalendarQuery,
     CalendarReservationResponse,
+    ReservationCreateIn,
+    ReservationCreateOut,
     ReservationListOut,
     ReservationOut,
 )
@@ -34,6 +37,65 @@ class ReservationService:
     # 생성자: 외부에서 수명을 관리하는 동기 DB 세션을 주입받아 보관한다.
     def __init__(self, db: Session) -> None:
         self.db = db
+
+    def create_reservation(
+        self, user_id: UUID, data: ReservationCreateIn
+    ) -> ReservationCreateOut:
+        """요청 전용 세션에서 예약을 생성하고 commit 또는 rollback한다.
+
+        READ COMMITTED에서 같은 회의실의 생성 요청을 행 잠금으로 직렬화한다.
+        향후 예약 수정도 중복 검사 전에 같은 회의실 잠금을 획득해야 한다.
+        세션에 이 요청과 관계없는 저장 작업을 섞지 않는다.
+        """
+        try:
+            # 잠금 대기 후 최신 상태를 확인하도록 기존 ORM 객체도 갱신한다.
+            room = self.db.scalar(
+                select(Room)
+                .where(Room.room_id == data.room_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+            if room is None:
+                raise ApiError(404, "ROOM_NOT_FOUND", "회의실을 찾을 수 없습니다.")
+            if room.status != RoomStatus.ACTIVE:
+                raise ApiError(409, "ROOM_UNAVAILABLE", "예약할 수 없는 회의실입니다.")
+
+            # 잠금을 기다리는 동안 시작 시각이 지났을 수도 있다.
+            now = datetime.now(ZoneInfo("Asia/Seoul"))
+            if data.start_at < now:
+                raise ApiError(400, "START_IN_PAST", "시작 시각은 과거일 수 없습니다.")
+            if self.db.get(User, user_id) is None:
+                raise ApiError(404, "USER_NOT_FOUND", "예약자를 찾을 수 없습니다.")
+
+            conflict = self.db.scalar(
+                select(Reservation.reservation_id)
+                .where(
+                    Reservation.room_id == data.room_id,
+                    Reservation.start_at < data.end_at,
+                    Reservation.end_at > data.start_at,
+                )
+                .limit(1)
+            )
+            if conflict is not None:
+                raise ApiError(409, "RESERVATION_CONFLICT", "이미 예약된 시간과 겹칩니다.")
+
+            reservation = Reservation(
+                room_id=data.room_id,
+                user_id=user_id,
+                title=data.title,
+                start_at=data.start_at,
+                end_at=data.end_at,
+                created_at=now,
+            )
+            self.db.add(reservation)
+            self.db.flush()
+            # 응답 구성까지 성공한 뒤 저장을 확정한다.
+            result = ReservationCreateOut.model_validate(reservation)
+            self.db.commit()
+            return result
+        except Exception:
+            self.db.rollback()
+            raise
 
     # 캘린더 예약 조회: 기간 겹침·생성자·회의실 조건으로 예약과 참석 정보를 구성한다.
     def get_calendar_reservations(
