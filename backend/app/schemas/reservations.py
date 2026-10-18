@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.users import Team
 
@@ -73,3 +73,42 @@ class ReservationListOut(BaseModel):
     total: int = Field(ge=0)
     page: int = Field(ge=1)
     page_size: int = 5
+
+
+class ReservationCreateIn(BaseModel):
+    """예약자 ID는 입력으로 받지 않고 컨트롤러에서 전달한다."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    room_id: UUID
+    title: str
+    start_at: AwareDatetime
+    end_at: AwareDatetime
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value: str) -> str:
+        title = value.strip()
+        if not title:
+            raise ValueError("회의 제목을 입력해 주세요.")
+        return title
+
+    @model_validator(mode="after")
+    def validate_period(self) -> "ReservationCreateIn":
+        if self.end_at <= self.start_at:
+            raise ValueError("종료 시각은 시작 시각보다 늦어야 합니다.")
+        return self
+
+
+class ReservationCreateOut(BaseModel):
+    """저장이 확정된 예약 한 건의 정보."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    reservation_id: UUID
+    room_id: UUID
+    user_id: UUID
+    title: str
+    start_at: AwareDatetime
+    end_at: AwareDatetime
+    created_at: AwareDatetime

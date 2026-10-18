@@ -6,6 +6,8 @@ from app.models.users import User
 from app.schemas.reservations import (
     CalendarQuery,
     CalendarReservationResponse,
+    ReservationCreateIn,
+    ReservationCreateOut,
     ReservationListQuery,
     ReservationListOut,
 )
@@ -20,6 +22,15 @@ class ReservationController:
     # 생성자: 예약 조회 업무를 위임할 서비스 객체를 외부에서 주입받는다.
     def __init__(self, service: ReservationService) -> None:
         self.service = service
+
+    def create_reservation(
+        self, data: ReservationCreateIn, current_user: User
+    ) -> ReservationCreateOut:
+        """외부에서 전달받은 사용자를 예약자로 지정해 생성을 요청한다."""
+        return self.service.create_reservation(
+            user_id=current_user.user_id,
+            data=data,
+        )
 
     # 캘린더 예약 조회: 조회 기간·필터와 인증 사용자 ID를 서비스에 전달한다.
     def get_calendar_reservations(
