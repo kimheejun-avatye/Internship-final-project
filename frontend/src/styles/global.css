@@ -1,0 +1,39 @@
+:root {
+  --primary: #5367cb;
+  --primary-soft: #7886d6;
+  --primary-tint: #eaf0ff;
+  --green: #188038;
+  --green-tint: #edf6f3;
+  --amber: #a17626;
+  --amber-tint: #fff4da;
+  --text: #202124;
+  --muted: #70757a;
+  --border: #dadce0;
+  --radius: 12px;
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body { margin: 0; color: var(--text); background: #fff; font-size: 14px; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+h1, h2, p { margin: 0; }
+
+/* ---- 공통 컴포넌트 ---- */
+.btn {
+  height: 48px; border: 0; border-radius: var(--radius);
+  background: var(--primary); color: #fff; font-weight: 700; font-size: 15px;
+}
+.btn:hover { filter: brightness(0.95); }
+.btn:disabled { background: var(--primary-soft); cursor: not-allowed; filter: none; }
+
+.card { border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+
+.chip { display: inline-block; padding: 6px 18px; border-radius: 14px; font-size: 13px; font-weight: 700; }
+.chip.green { background: #eaf6f1; color: var(--green); }
+.chip.amber { background: var(--amber-tint); color: var(--amber); }
+.chip.blue { background: var(--primary-tint); color: var(--primary); }
+
+.text-link { border: 0; background: none; padding: 0; font-size: 16px; }
