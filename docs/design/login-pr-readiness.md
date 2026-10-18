@@ -1,7 +1,7 @@
 # developer 머지와 로그인 이동 검증
 
-- 작업: codex/login-only의 e087f49에 origin/developer ddb56f9 머지.
-- 다른 teamproject1/codex/login, main, developer 원격에는 변경하지 않음.
+- 작업: codex/login-only의 e087f49에 origin/developer d686b4f 머지.
+- 다른 teamproject1/codex/login과 main은 변경하지 않으며, 검증한 통합 결과는 사용자 요청에 따라 developer에 반영한다.
 - 회원가입 담당 코드·정책, users 부분 UNIQUE, 회의실·예약·캘린더 서비스와 DTO·모델·기존 migration을 보존.
 - 팀 화면·CSS·임시 데이터를 포함하고 App 라우팅·ProtectedRoute·팀 AppLayout의 세션 로그아웃 및 비밀번호 변경 메뉴를 연결.
 - 로그인 성공은 이전 목적지와 관계없이 /reservations, 기존 세션으로 인증 화면 접근도 /reservations로 이동.
@@ -12,7 +12,7 @@
 
 ## 검증
 
-- 백엔드 85개 통과: 회원가입·로그인·비밀번호·세션·동시성·회의실·예약 조회.
+- 백엔드 114개 통과: 회원가입·로그인·비밀번호·세션·동시성·회의실·예약 조회.
 - 프런트 26개 통과, TypeScript 검사·프로덕션 빌드 성공.
 - 로그인 성공→예약하기, 기존 세션→예약하기, 비로그인 캘린더→로그인, 팀 메뉴·로그아웃 검증.
 - 테스트 Origin은 로컬 .env의 5175 설정과 분리해 고정한다. 테스트 DB 이름도 TEST_DATABASE_URL에서 확정한다.

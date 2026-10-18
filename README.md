@@ -1,6 +1,6 @@
 # 회의실 예약 — 로그인과 developer 통합
 
-작업 폴더는 login-only, 브랜치는 codex/login-only다. 회원가입·세션 로그인 전용 e087f49에 developer ddb56f9를 머지했다. main·developer 원격 브랜치와 별도 teamproject1 폴더의 codex/login은 변경하지 않는다.
+작업 폴더는 login-only, 브랜치는 codex/login-only다. 회원가입·세션 로그인 전용 e087f49에 developer d686b4f를 머지했다. main과 별도 teamproject1 폴더의 codex/login은 변경하지 않는다. 사용자 요청에 따라 검증한 통합 결과를 developer에 반영한다.
 
 ## 로그인 후 이동
 
@@ -37,6 +37,6 @@ frontend/src/
 
 ## 확인 결과
 
-백엔드 85개·프런트 26개 테스트, TypeScript 검사·프로덕션 빌드·인증 코드 정적 검사 통과. 캘린더 화면은 기존 팀 임시 데이터를 유지하며 실제 API로의 교체는 이번 머지에서 구현하지 않는다.
+백엔드 114개·프런트 26개 테스트, TypeScript 검사·프로덕션 빌드·인증 코드 정적 검사 통과. 캘린더 화면은 기존 팀 임시 데이터를 유지하며 실제 API로의 교체는 이번 머지에서 구현하지 않는다.
 
 [실행 안내](docs/design/login-implementation.md) · [머지 검증](docs/design/login-pr-readiness.md)
