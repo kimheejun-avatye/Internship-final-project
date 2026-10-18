@@ -36,80 +36,35 @@ bash backend/scripts/migrate.sh
 ## 폴더 구조
 
 ```text
-project2/
-├── README.md                    # 프로젝트 안내와 파일 위치
-├── .gitignore                   # Git 제외 규칙 작성 예정
-├── compose.yaml                 # 로컬 PostgreSQL 실행 설정
-├── docs/
-│   ├── design/                  # 구조·ERD·인증·설계 결정
-│   └── collaboration/           # 실행 방법·작업 분담·API 약속
+teamproject1/
 ├── backend/
-│   ├── pyproject.toml           # Python 의존성 설정용
-│   ├── .env.example             # 환경변수 예시 작성용
-│   ├── alembic.ini              # DB 마이그레이션 설정용
-│   ├── migrations/
-│   │   ├── env.py
-│   │   └── versions/            # 스키마 변경 이력
 │   ├── app/
-│   │   ├── main.py              # FastAPI 시작과 라우터 연결
-│   │   ├── api/routes/          # HTTP 요청·응답
-│   │   │   ├── auth.py          # 가입·로그인·로그아웃·재발급
-│   │   │   ├── users.py         # 사용자 정보
-│   │   │   ├── rooms.py         # 회의실
-│   │   │   └── reservations.py  # 예약
-│   │   ├── schemas/             # 요청·응답 형식
-│   │   │   ├── auth.py
-│   │   │   ├── users.py
-│   │   │   ├── rooms.py
-│   │   │   └── reservations.py
-│   │   ├── services/            # 업무 규칙과 처리 순서
-│   │   │   ├── auth.py
-│   │   │   ├── refresh.py       # Refresh Token 처리
-│   │   │   ├── users.py
-│   │   │   ├── rooms.py
-│   │   │   └── reservations.py
-│   │   ├── models/              # ERD의 네 테이블 정의
-│   │   │   ├── users.py
-│   │   │   ├── refresh_token.py
-│   │   │   ├── rooms.py
-│   │   │   └── reservations.py
-│   │   ├── core/
-│   │   │   ├── config.py        # 환경변수와 서버 설정
-│   │   │   ├── security.py      # 비밀번호·인증 보안 도구
-│   │   │   └── exceptions.py    # 공통 오류 처리
-│   │   └── db/
-│   │       ├── base.py          # 모델 공통 기반
-│   │       └── session.py       # DB 연결과 트랜잭션 지원
-│   ├── tests/                   # 인증·사용자·회의실·예약·DB 테스트용
-│   └── scripts/
-│       └── seed.py              # 개발용 초기 데이터 작성용
-└── frontend/src/
-    ├── main.ts                  # 화면 앱 시작
-    ├── app/                     # 화면 전환·상태·스타일
-    ├── pages/
-    │   ├── auth/                # 가입·로그인
-    │   ├── profile/             # 사용자 정보
-    │   ├── rooms/               # 회의실·예약 화면
-    │   └── calendar/            # 예약 달력
-    └── shared/                  # 공통 API 호출·타입·화면 도구
+│   │   ├── api/          # 팀 회원가입·회의실 API + 로그인·비밀번호·프로필 API
+│   │   ├── schemas/      # 요청·응답 형식
+│   │   ├── services/     # 인증 업무 로직·팀 예약/캘린더 스켈레톤
+│   │   ├── models/       # 팀 모델 + 세션·로그인 제한·재설정 모델
+│   │   ├── core/         # 설정·보안·공통 오류
+│   │   └── db/           # DB 연결
+│   ├── migrations/       # 0001 → 0002 → 팀 캘린더 0003 → 로그인 0004
+│   └── tests/
+├── frontend/src/
+│   ├── main.tsx          # React 진입점
+│   ├── App.tsx           # 팀 화면과 인증 화면 라우팅
+│   ├── auth/             # 세션 상태·보호 라우트
+│   ├── layouts/          # 인증 화면 공통 틀 AuthLayout
+│   ├── components/       # 팀 AppLayout·Logo
+│   ├── pages/            # auth·profile·reservation·calendar·admin
+│   ├── shared/           # API·타입·hooks
+│   ├── mocks/            # 팀 예약·캘린더·관리자 화면의 기존 임시 데이터
+│   └── styles/
+└── docs/
+    ├── design/
+    └── collaboration/
 ```
 
-Python 패키지의 `__init__.py`는 트리에서 생략했다. 프런트엔드는 기존 사이트의 파일 배치를 따른 자리이며 빌드 도구·프레임워크 설정은 아직 없다.
+실제 진입점은 `frontend/src/main.tsx`다. 팀 공통 AppLayout에 세션 로그아웃을 연결하고, 기존 예약·캘린더·관리자 메뉴와 화면을 유지한다. 예약·캘린더 화면의 임시 데이터를 실제 API로 바꾸는 작업은 해당 기능 담당자의 범위다.
 
-## 파일을 찾는 기준
-
-| 수정할 내용 | 위치 |
-|---|---|
-| API 주소·상태 코드·응답 | `backend/app/api/routes/` |
-| 입력·응답 데이터 형식 | `backend/app/schemas/` |
-| 기능의 처리 순서·업무 규칙 | `backend/app/services/` |
-| 테이블·컬럼·관계 | `backend/app/models/` |
-| DB 구조 변경 이력 | `backend/migrations/versions/` |
-| 로그인·예약 화면 | `frontend/src/pages/` |
-
-각 화면의 `templates.ts`는 화면 마크업, `index.ts`는 이벤트와 화면 동작을 담당하도록 구성한다.
-
-[구조 설명](docs/design/architecture.md) · [DB 대응표](docs/design/database.md)
+[구조 설명](docs/design/architecture.md) · [DB 설계](docs/design/database.md) · [로그인 PR 검증](docs/design/login-pr-readiness.md)
 
 ## 로그인 개발
 

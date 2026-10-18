@@ -1,22 +1,38 @@
 # PostgreSQL ERD
 
-마이그레이션 `backend/migrations/versions/0001_initial_schema.py` (revision `0001`) 기준이다.
+마이그레이션 `0001_initial_schema.py`에 회원가입용 `0002_signup.py`(revision `0002`)를 적용한 상태 기준이다. 아래 `users` 외 기존 테이블 설명은 0001 그대로다.
 널 여부의 `불가`는 `NOT NULL`, `허용`은 `NULL`을 뜻한다.
 
 ## users
 
 | 컬럼명 | 타입 | 널 여부 |
 |---|---|---|
-| user_id | UUID | 불가 |
+| user_id | UUID (기본값 gen_random_uuid()) | 불가 |
 | email | TEXT | 불가 |
+| name | TEXT | 불가 |
+| birth_date | DATE | 허용 |
+| phone | TEXT | 허용 |
 | password_hash | TEXT | 불가 |
-| team | user_team ENUM (AVATYE, GURU) | 불가 |
-| role | user_role ENUM (ADMIN, MEMBER) | 불가 |
-| created_at | TIMESTAMP WITHOUT TIME ZONE | 불가 |
-| updated_at | TIMESTAMP WITHOUT TIME ZONE | 허용 |
+| team | team_type ENUM (AVATYE, GURU) | 불가 |
+| role | role_type ENUM (ADMIN, MEMBER), 기본값 MEMBER | 불가 |
+| created_at | TIMESTAMPTZ (기본값 now()) | 불가 |
+| updated_at | TIMESTAMPTZ | 허용 |
+| approved_at | TIMESTAMPTZ (NULL이면 승인 대기) | 허용 |
 | blocked_at | TIMESTAMPTZ | 허용 |
 
-PK: `user_id`. UNIQUE: `email`.
+PK: `user_id`. 부분 UNIQUE 인덱스 `users_email_active_uniq`: `blocked_at IS NULL`인 행끼리 `email` 고유. CHECK: `email = lower(btrim(email))`, `phone`은 `^01[016789][0-9]{7,8}$`.
+
+## email_verifications
+
+이메일당 1행. PK `email`. 컬럼: `code_hash`, `code_expires_at`, `last_sent_at`, `failed_count`, `locked_until`, `signup_token_hash`, `signup_token_expires_at`, `created_at`.
+
+## email_send_log
+
+인증 메일 발송 기록. PK `log_id`. 컬럼: `email`, `ip`, `sent_at`, `failed`(서버 쪽 발송 실패, 이메일별 횟수에서 제외). 인덱스: `(email, sent_at)`, `(ip, sent_at)`.
+
+## signup_check_log
+
+[확인하기] 요청 기록. PK `log_id`. 컬럼: `ip`, `checked_at`. 인덱스: `(ip, checked_at)`.
 
 ## refresh_token
 
@@ -68,8 +84,7 @@ PK: `reservation_id`. FK: `room_id` → `rooms.room_id`, `user_id` → `users.us
 
 각 자식 행은 반드시 부모 한 행을 참조한다. FK는 PostgreSQL 기본 동작인 `NO ACTION`을 사용하며 연쇄 삭제하지 않는다.
 원본 주석의 PK·FK·UNIQUE는 실제 제약으로 적용했다. 이름과 컬럼이 정의되지 않은 빈 `Untitled` 테이블은 제외했다.
-UUID와 시간 컬럼에 자동 생성 기본값은 추가하지 않았으므로 INSERT 시 필수 값을 전달해야 한다.
-`TIMESTAMPTZ`는 `TIMESTAMP WITH TIME ZONE`이다. `users.created_at`과 `users.updated_at`은 원본대로 시간대 없는 타입을 유지한다.
+`TIMESTAMPTZ`는 `TIMESTAMP WITH TIME ZONE`이다.
 
 Alembic은 별도로 `alembic_version` 관리 테이블을 생성한다.
 

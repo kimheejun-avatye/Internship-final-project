@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.api.routes import auth, login, password, users
+from app.api.routes import auth, login, password, rooms, users
 from app.core.config import settings
 from app.core.exceptions import ApiError
 from app.db.session import SessionLocal
@@ -22,7 +22,7 @@ if settings.production and (
     raise RuntimeError("Production APP_ORIGINS must contain HTTPS origins")
 
 app = FastAPI(title="Meeting Room API")
-for router in (auth.router, login.router, password.router, users.router):
+for router in (auth.router, login.router, password.router, users.router, rooms.router):
     app.include_router(router)
 
 
@@ -92,7 +92,7 @@ async def database_error(request, exc):
                 "message": "일시적인 서버 오류입니다. 다시 시도해주세요.",
             }
         },
-        status_code=503,
+        status_code=503 if request.url.path.startswith("/api/") else 500,
     )
 
 

@@ -32,7 +32,7 @@ class Settings:
         self.smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
         self.smtp_port = _int("SMTP_PORT", 587)
         self.smtp_user = os.environ.get("SMTP_USER", "")
-        self.smtp_password = os.environ.get("SMTP_PASSWORD", "")
+        self.smtp_password = os.environ.get("SMTP_PASSWORD", "").replace(" ", "")
 
         self.code_ttl_seconds = _int("CODE_TTL_SECONDS", 300)
         self.resend_cooldown_seconds = _int("RESEND_COOLDOWN_SECONDS", 60)

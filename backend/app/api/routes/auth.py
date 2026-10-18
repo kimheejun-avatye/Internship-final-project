@@ -28,18 +28,10 @@ def check_email(body: EmailIn, request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/send-code", response_model=SendCodeOut)
-def send_code(
-    body: EmailIn,
-    request: Request,
-    background: BackgroundTasks,
-    db: Session = Depends(get_db),
-):
+def send_code(body: EmailIn, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
     log_id, code = signup.send_code(db, client_ip(request), body.email)
     background.add_task(mailer.deliver_code, log_id, body.email, code)
-    return {
-        "cooldown_seconds": settings.resend_cooldown_seconds,
-        "expires_in": settings.code_ttl_seconds,
-    }
+    return {"cooldown_seconds": settings.resend_cooldown_seconds, "expires_in": settings.code_ttl_seconds}
 
 
 @router.post("/verify-code", response_model=VerifyCodeOut)

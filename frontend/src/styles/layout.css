@@ -1,12 +1,18 @@
+.app { height: 100%; display: flex; flex-direction: column; }
+.app-header { height: 81px; flex: none; display: flex; align-items: center; padding: 0 30px; border-bottom: 1px solid var(--border); }
+.app-header img { width: 135px; }
+.app-body { flex: 1; display: flex; min-height: 0; }
+.sidebar { width: 232px; flex: none; border-right: 1px solid var(--border); padding: 40px 12px 24px; display: flex; flex-direction: column; }
+.sidebar nav { display: flex; flex-direction: column; gap: 8px; }
+.sidebar nav a { display: flex; align-items: center; height: 42px; padding: 0 24px; border-radius: 12px; font-size: 16px; }
+.sidebar nav a.active { background: var(--primary-tint); color: var(--primary); font-weight: 700; }
+.sidebar .logout { margin-top: auto; padding: 0 24px; border: 0; background: none; text-align: left; color: var(--primary); font-weight: 700; font-size: 16px; }
+.main { flex: 1; min-width: 0; overflow: auto; padding: 56px 44px 48px; }
+.page-title { font-size: 28px; font-weight: 700; margin-bottom: 40px; }
+
 .status-page { padding: 64px 24px; text-align: center; }
-.app-header { padding: 20px 32px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap; }
-.app-logo { width: 150px; }
-.app-header nav { display: flex; align-items: center; gap: 20px; }
-.app-header .btn { padding: 0 20px; }
-.app-content { max-width: 1040px; padding: 40px 24px; margin: auto; }
 .profile-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,320px),1fr)); gap: 24px; margin-top: 24px; align-items: start; }
 .profile-card { padding: 28px; }
 .profile-card h2 { font-size: 20px; }
 .notice { color: var(--muted); line-height: 1.6; margin: 20px 0; }
 .full-width { width: 100%; margin-top: 20px; }
-@media (max-width: 520px) { .app-header { padding: 16px; } .app-header nav { gap: 12px; } .auth-logo.large { margin-top: 32px; max-width: 85%; } }

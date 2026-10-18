@@ -6,7 +6,7 @@
 
 서버 세션 로그인, 현재 회원 조회, 현재 세션 로그아웃, 사용자 활동 연장, 내 프로필 이름 수정, 현재 비밀번호로 비밀번호 변경, 이메일 코드 기반 비밀번호 재설정을 구현했다. 회원가입은 `feat/sign-up` 코드를 통합했다. 로그인·회원가입 프론트는 기존 팀원 코드를 기반으로 한다.
 
-로그인과 회원가입은 `AuthLayout`, 내 프로필은 `ProtectedRoute → AppLayout`에 배치했다. `AuthProvider`는 서버 `/api/auth/me`로 로그인 상태를 복원한다. 실제 권한·차단·승인·만료 검사는 서버가 수행한다.
+로그인과 회원가입은 `AuthLayout`, 내 프로필과 팀 기존 화면은 `ProtectedRoute → components/AppLayout`에 배치했다. `AuthProvider`는 서버 `/api/auth/me`로 로그인 상태를 복원한다. 실제 권한·차단·승인·만료 검사는 서버가 수행한다.
 
 ## 실행
 
@@ -60,9 +60,9 @@ uv run python -m app.admin member@example.com
 - `backend/app/api/dependencies.py`: 세션·CSRF 검증, 요청 완료 후 활동 갱신과 잠금 해제.
 - `backend/app/services/{auth,sessions,login_limits,passwords}.py`: 업무 규칙과 트랜잭션.
 - `backend/app/core/security.py`: Argon2id 공통 함수. 기존 RFC 9106의 64MiB·3회·병렬 4 설정 재사용.
-- `backend/migrations/versions/0003_login_sessions.py`: 세션·제한·재설정 테이블과 이메일 전체 고유 인덱스.
+- `backend/migrations/versions/0004_login_sessions.py`: 세션·제한·재설정 테이블과 이메일 전체 고유 인덱스.
 - `frontend/src/auth/`: 인증 상태와 보호 라우트.
-- `frontend/src/layouts/`: 인증 화면·앱 공통 틀.
+- `frontend/src/layouts/AuthLayout.tsx`: 인증 화면 공통 틀. 팀 공통 틀은 `frontend/src/components/AppLayout.tsx`를 유지한다.
 - `frontend/src/shared/api/`: 쿠키·CSRF를 포함한 공통 요청 및 기능 API.
 
 성공 응답에는 사용자 정보와 만료 시각을 반환하며 비밀번호 해시·세션 원문을 JSON에 포함하지 않는다. 오류는 `{"detail":{"code":"...","message":"..."}}`, 제한 오류는 `retry_after`와 `Retry-After` 헤더를 포함한다. 입력 오류는 FastAPI의 422 필드 오류를 프론트에서 해석한다.
@@ -75,7 +75,7 @@ uv run python -m app.admin member@example.com
 
 회원 행 → 세션 행의 잠금 순서를 공유해 로그인과 비밀번호 변경의 경쟁을 처리한다. 가입 회원 생성과 인증 소비, 비밀번호 변경·재설정과 전체 세션 폐기는 각각 같은 트랜잭션이다. 이메일 UNIQUE 위반만 409 `EMAIL_ALREADY_EXISTS`로 변환한다.
 
-`0003`은 차단된 계정까지 포함한 전체 이메일 고유 제약을 추가한다. 기존 DB에 같은 이메일이 이미 여러 개 있으면 마이그레이션이 실패하며 데이터를 자동 삭제하지 않는다. 이 경우 계정 정리 정책을 정한 후 진행한다. 기존 `refresh_token` 테이블은 삭제하지 않고 사용만 중단한다.
+`0004`는 차단된 계정까지 포함한 전체 이메일 고유 제약을 추가한다. 기존 DB에 같은 이메일이 이미 여러 개 있으면 마이그레이션이 실패하며 데이터를 자동 삭제하지 않는다. 이 경우 계정 정리 정책을 정한 후 진행한다. 기존 `refresh_token` 테이블은 삭제하지 않고 사용만 중단한다.
 
 ## 테스트
 
@@ -107,3 +107,5 @@ npm run build
 - 브라우저에서 잘못된 로그인 거절과 비밀번호 찾기 화면 이동 확인.
 - 로컬 PostgreSQL과 백엔드 8001, 프론트 5174 연결 확인. 실제 SMTP 전달은 자격 증명이 없어 검증하지 않음.
 - Git 커밋·원격 푸시는 수행하지 않았음.
+
+최신 developer와의 통합 검증 및 기존 로그인 전용 로컬 DB 주의사항은 [로그인 PR 검증](login-pr-readiness.md)을 따른다. 위 최초 검증 기록은 통합 전 이력이다.

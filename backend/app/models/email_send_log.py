@@ -26,6 +26,4 @@ class EmailSendLog(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     # 서버 쪽 발송 실패(재시도 소진, 5xx)는 사용자 횟수에서 제외한다
-    failed: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
+    failed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))

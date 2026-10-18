@@ -1,3 +1,6 @@
 @import "./global.css";
 @import "./auth.css";
 @import "./layout.css";
+@import "./reservation.css";
+@import "./calendar.css";
+@import "./admin.css";

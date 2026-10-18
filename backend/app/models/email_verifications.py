@@ -18,14 +18,10 @@ class EmailVerification(Base):
     code_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     last_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     # 재전송해도 초기화하지 않는다
-    failed_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default="0"
-    )
+    failed_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     signup_token_hash: Mapped[Optional[str]] = mapped_column(Text)
-    signup_token_expires_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True)
-    )
+    signup_token_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

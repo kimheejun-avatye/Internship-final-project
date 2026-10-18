@@ -37,7 +37,7 @@ def clean_db(migrated):
     with SessionLocal() as db:
         db.execute(
             text(
-                "TRUNCATE users, email_verifications, email_send_log, signup_check_log, login_failures, login_locks, login_ip_requests, password_reset_verifications CASCADE"
+                "TRUNCATE rooms, users, email_verifications, email_send_log, signup_check_log, login_failures, login_locks, login_ip_requests, password_reset_verifications CASCADE"
             )
         )
         db.commit()
