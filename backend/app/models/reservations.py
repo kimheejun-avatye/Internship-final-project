@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -13,7 +14,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database.base import Base
+from app.db.base import Base
 
 
 class Reservation(Base):
@@ -64,7 +65,7 @@ class Reservation(Base):
     )
 
     # 기존 ERD의 참석 인원수
-    participants: Mapped[int | None] = mapped_column(
+    participants: Mapped[Optional[int]] = mapped_column(
         Integer,
         nullable=True,
     )

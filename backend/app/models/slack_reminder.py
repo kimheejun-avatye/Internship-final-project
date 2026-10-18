@@ -1,6 +1,7 @@
 # app/models/slack_reminder.py
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -15,7 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database.base import Base
+from app.db.base import Base
 
 
 class ReminderStatus(str, Enum):
@@ -78,7 +79,7 @@ class SlackReminder(Base):
         nullable=False,
     )
 
-    slack_channel_id: Mapped[str | None] = mapped_column(
+    slack_channel_id: Mapped[Optional[str]] = mapped_column(
         Text,
         nullable=True,
     )
@@ -92,19 +93,19 @@ class SlackReminder(Base):
     )
 
     # 처리 시작 시각
-    claimed_at: Mapped[datetime | None] = mapped_column(
+    claimed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )
 
     # 발송 완료 시각
-    sent_at: Mapped[datetime | None] = mapped_column(
+    sent_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )
 
     # 오류 내용
-    last_error: Mapped[str | None] = mapped_column(
+    last_error: Mapped[Optional[str]] = mapped_column(
         Text,
         nullable=True,
     )

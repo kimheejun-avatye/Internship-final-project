@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy import ForeignKey, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database.base import Base
+from app.db.base import Base
 
 
 class ReservationAttendee(Base):

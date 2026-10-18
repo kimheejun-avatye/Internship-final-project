@@ -10,7 +10,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database.base import Base
+from app.db.base import Base
 
 
 class RoomStatus(str, Enum):
@@ -22,7 +22,7 @@ class Room(Base):
     __tablename__ = "rooms"
 
     __table_args__ = (
-        # 회의 참석자는 음수가 될 수 없음
+        # 회의실 수용 인원은 0보다 커야 함
         CheckConstraint(
             "capacity > 0",
             name="ck_rooms_capacity",
