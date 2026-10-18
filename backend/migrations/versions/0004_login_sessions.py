@@ -1,4 +1,4 @@
-"""Server sessions, login limits, reset verification, and globally unique email.
+"""Server sessions, login limits and password reset verification.
 
 Revision ID: 0004
 Revises: 0003
@@ -14,9 +14,6 @@ depends_on = None
 
 
 def upgrade():
-    # Fail rather than silently discard existing duplicates.
-    op.create_index("users_email_uniq", "users", ["email"], unique=True)
-    op.drop_index("users_email_active_uniq", table_name="users")
     op.create_table(
         "user_sessions",
         sa.Column(
@@ -96,11 +93,3 @@ def downgrade():
         "user_sessions",
     ):
         op.drop_table(table)
-    op.create_index(
-        "users_email_active_uniq",
-        "users",
-        ["email"],
-        unique=True,
-        postgresql_where=sa.text("blocked_at IS NULL"),
-    )
-    op.drop_index("users_email_uniq", table_name="users")

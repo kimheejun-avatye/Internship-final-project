@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import * as api from "../shared/api/auth";
-import { ApiError, setCsrfToken } from "../shared/api/client";
+import { ApiError, setCsrfToken } from "../shared/api/session-client";
 import type { SessionInfo, Expiry } from "../shared/types/auth";
 import { useSessionActivity } from "../shared/hooks/useSessionActivity";
 

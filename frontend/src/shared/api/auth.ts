@@ -1,4 +1,4 @@
-import { post, request } from "./client";
+import { post, request } from "./session-client";
 import type { SessionInfo, Expiry } from "../types/auth";
 export const login = (email: string, password: string) => post<SessionInfo>("/api/auth/login", { email, password });
 export const getMe = () => request<SessionInfo>("/api/auth/me");

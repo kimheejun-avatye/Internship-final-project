@@ -6,7 +6,7 @@ from app.core.security import verify_password
 from app.db.session import SessionLocal
 from app.main import app
 from app.models import EmailSendLog, PasswordResetVerification, User, UserSession
-from app.services import mailer
+from app.services import password_mailer as mailer
 
 NEW = "Changed123!"
 
@@ -227,3 +227,73 @@ def test_current_password_repeated_guessing_limited(client, seed):
             json={"current_password": "wrong", "new_password": NEW},
         )
         assert r.status_code == (429 if i == 4 else 400)
+
+
+def test_reset_only_changes_current_account_with_same_email(client, seed, monkeypatch):
+    old_id = seed(blocked=True)
+    current_id = seed()
+    token = proof(client, monkeypatch)
+    with SessionLocal() as db:
+        assert (
+            db.get(PasswordResetVerification, "member@example.com").user_id
+            == current_id
+        )
+    assert (
+        client.post(
+            "/api/auth/password/reset", json={"reset_token": token, "new_password": NEW}
+        ).status_code
+        == 204
+    )
+    with SessionLocal() as db:
+        assert verify_password(PASSWORD, db.get(User, old_id).password_hash)
+        assert verify_password(NEW, db.get(User, current_id).password_hash)
+    assert signin(client, password=NEW).json()["user"]["user_id"] == str(current_id)
+
+
+def test_reset_does_not_email_blocked_only_account(client, seed, monkeypatch):
+    seed(blocked=True)
+    sent = []
+    monkeypatch.setattr(mailer, "send_email", lambda *args: sent.append(args))
+    assert (
+        client.post(
+            "/api/auth/password/reset/send-code", json={"email": "member@example.com"}
+        ).status_code
+        == 200
+    )
+    assert sent == []
+    with SessionLocal() as db:
+        assert db.get(PasswordResetVerification, "member@example.com").user_id is None
+
+
+def test_change_preserves_blocked_historical_account(client, seed):
+    old_id = seed(blocked=True)
+    current_id = seed()
+    assert signin(client).status_code == 200
+    assert (
+        client.post(
+            "/api/auth/password/change",
+            json={"current_password": PASSWORD, "new_password": NEW},
+        ).status_code
+        == 204
+    )
+    with SessionLocal() as db:
+        assert verify_password(PASSWORD, db.get(User, old_id).password_hash)
+        assert verify_password(NEW, db.get(User, current_id).password_hash)
+
+
+def test_old_reset_proof_cannot_change_reregistered_account(client, seed, monkeypatch):
+    old_id = seed()
+    token = proof(client, monkeypatch)
+    from app.services import clock
+
+    with SessionLocal() as db:
+        db.get(User, old_id).blocked_at = clock.now()
+        db.commit()
+    new_id = seed()
+    result = client.post(
+        "/api/auth/password/reset", json={"reset_token": token, "new_password": NEW}
+    )
+    assert result.status_code == 400
+    with SessionLocal() as db:
+        assert verify_password(PASSWORD, db.get(User, new_id).password_hash)
+        assert verify_password(PASSWORD, db.get(User, old_id).password_hash)

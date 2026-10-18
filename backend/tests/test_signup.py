@@ -36,15 +36,3 @@ def test_signup_pending_uuid_and_consumed(client):
     uuid.UUID(r.json()["user_id"])
     assert r.json()["status"] == "PENDING"
     assert client.post("/api/auth/signup", json=body).status_code == 400
-
-
-def test_blocked_email_still_unique_and_proof_rolled_back(client, seed):
-    seed(blocked=True)
-    body = payload()
-    r = client.post("/api/auth/signup", json=body)
-    assert r.status_code == 409 and r.json()["detail"]["code"] == "EMAIL_ALREADY_EXISTS"
-    with SessionLocal() as db:
-        assert (
-            db.get(EmailVerification, "member@example.com").signup_token_hash
-            is not None
-        )

@@ -32,6 +32,7 @@ class Settings:
         self.smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com")
         self.smtp_port = _int("SMTP_PORT", 587)
         self.smtp_user = os.environ.get("SMTP_USER", "")
+        # Gmail 앱 비밀번호는 4자리씩 공백으로 나뉘어 표시되므로 공백은 제거한다
         self.smtp_password = os.environ.get("SMTP_PASSWORD", "").replace(" ", "")
 
         self.code_ttl_seconds = _int("CODE_TTL_SECONDS", 300)

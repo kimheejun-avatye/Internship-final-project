@@ -9,7 +9,7 @@ from app.core.exceptions import ApiError
 from app.models.email_send_log import EmailSendLog
 from app.models.password_reset_verifications import PasswordResetVerification as Reset
 from app.models.users import User
-from app.services import clock, login_limits, mailer, sessions
+from app.services import clock, login_limits, password_mailer, sessions
 
 
 def change(db, user, current_password, new_password):
@@ -89,12 +89,12 @@ def send_code(db, ip, email):
                 "인증 메일 요청이 많습니다.",
                 int(window.total_seconds()),
             )
-    user = db.scalar(select(User).where(User.email == email))
+    user = db.scalar(select(User).where(User.email == email, User.blocked_at.is_(None)))
     code = security.new_code()
     if user and user.blocked_at is None:
         # SMTP failure rolls the transaction back, preserving prior proof and quota.
         try:
-            mailer.send_email(
+            password_mailer.send_email(
                 email,
                 "[회의실 예약] 비밀번호 재설정",
                 f"인증번호: {code}\n{settings.code_ttl_seconds // 60}분 안에 입력해주세요.",

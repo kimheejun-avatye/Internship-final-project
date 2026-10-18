@@ -144,7 +144,7 @@ export default function SignupPage() {
         setCodeSent(false);
         setForm((prev) => ({ ...prev, code: "" }));
         setError("code", "인증 시간이 지났습니다. 인증번호를 다시 받아 주세요.");
-      } else if (err instanceof ApiError && ["EMAIL_TAKEN", "EMAIL_ALREADY_EXISTS"].includes(err.code)) {
+      } else if (err instanceof ApiError && err.code === "EMAIL_TAKEN") {
         setError("email", err.message);
       } else if (err instanceof ApiError && err.code === "VALIDATION" && err.extra.fields) {
         const mapped: Errors = {};
@@ -163,21 +163,21 @@ export default function SignupPage() {
 
   if (done) {
     return (
-      <>
+      <div className="auth-page">
         <div className="auth-box signup done-box">
           <Logo className="auth-logo small" />
           <h1>가입 요청이 완료되었습니다</h1>
           <p>관리자가 승인하면 로그인할 수 있습니다.</p>
           <Link to="/login" className="btn link-btn">로그인으로 돌아가기</Link>
         </div>
-      </>
+      </div>
     );
   }
 
   const sendLabel = busy === "send" ? "전송 중…" : cooldown.seconds > 0 ? `재전송 (${cooldown.seconds})` : codeSent ? "재전송" : "인증번호 요청";
 
   return (
-    <>
+    <div className="auth-page">
       <form className="auth-box signup" onSubmit={submit} noValidate>
         <Logo className="auth-logo small" />
 
@@ -253,6 +253,6 @@ export default function SignupPage() {
         <Link to="/login" className="back-link">로그인으로 돌아가기</Link>
       </form>
       {showPrivacy && <PrivacyDialog onClose={() => setShowPrivacy(false)} />}
-    </>
+    </div>
   );
 }

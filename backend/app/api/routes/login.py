@@ -4,7 +4,7 @@ from app.api.dependencies import authenticated, client_ip, delete_cookie, set_co
 from app.core.config import settings
 from app.core.exceptions import ApiError
 from app.db.session import get_db
-from app.schemas.auth import ExpiryOut, LoginIn, SessionOut
+from app.schemas.login import ExpiryOut, LoginIn, SessionOut
 from app.services import auth, clock, sessions
 
 router = APIRouter(prefix="/api/auth", tags=["login"])

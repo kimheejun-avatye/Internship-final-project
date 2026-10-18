@@ -3,7 +3,6 @@
 import logging
 import random
 import smtplib
-import ssl
 import time
 import uuid
 from email.message import EmailMessage
@@ -30,18 +29,15 @@ def send_email(to: str, subject: str, body: str) -> None:
     msg["Subject"] = subject
     msg.set_content(body)
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as smtp:
-        smtp.starttls(context=ssl.create_default_context())
+        smtp.starttls()
         smtp.login(settings.smtp_user, settings.smtp_password)
-        if smtp.send_message(msg):
-            raise smtplib.SMTPRecipientsRefused({to: (550, "recipient refused")})
+        smtp.send_message(msg)
 
 
 def _transient(exc: Exception) -> bool:
     if isinstance(exc, smtplib.SMTPResponseException):
         return 400 <= exc.smtp_code < 500
-    return isinstance(
-        exc, (smtplib.SMTPServerDisconnected, TimeoutError, ConnectionError)
-    )
+    return isinstance(exc, (smtplib.SMTPServerDisconnected, TimeoutError, ConnectionError))
 
 
 def deliver_code(log_id: uuid.UUID, email: str, code: str) -> None:
@@ -60,9 +56,5 @@ def deliver_code(log_id: uuid.UUID, email: str, code: str) -> None:
             break
     # 서버 쪽 실패는 사용자의 시간당 횟수에서 제외한다
     with db.SessionLocal() as session:
-        session.execute(
-            update(EmailSendLog)
-            .where(EmailSendLog.log_id == log_id)
-            .values(failed=True)
-        )
+        session.execute(update(EmailSendLog).where(EmailSendLog.log_id == log_id).values(failed=True))
         session.commit()

@@ -11,7 +11,18 @@ _DUMMY_HASH = security.hash_password(secrets.token_urlsafe(32))
 
 def login(db, ip, email, password):
     key, limit = login_limits.email_limit(db, email)
-    user = db.scalar(select(User).where(User.email == email).with_for_update())
+    # Signup permits blocked historical accounts with the same email.
+    # Authenticate only the current unblocked account; never try an old password
+    # against another account after a failed password check.
+    user = db.scalar(
+        select(User)
+        .where(User.email == email)
+        .order_by(
+            User.blocked_at.is_(None).desc(), User.created_at.desc(), User.user_id
+        )
+        .limit(1)
+        .with_for_update()
+    )
     if (
         not security.verify_password(
             password, user.password_hash if user else _DUMMY_HASH

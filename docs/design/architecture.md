@@ -1,24 +1,19 @@
-# 실제 구현 구조
+# 파일 구조와 책임
 
-로그인 PR은 최신 developer의 팀 구조를 유지하고 인증을 추가한다.
+역할별 계층 구조를 사용한다. 같은 기능은 각 계층에서 같은 이름으로 찾는다. 예를 들어 예약은 `api/routes/reservations.py`, `schemas/reservations.py`, `services/reservations.py`, `models/reservations.py`로 연결된다.
 
-| 위치 | 책임 |
+| 영역 | 책임 |
 |---|---|
-| backend/app/api/routes | 팀 회원가입·회의실 HTTP API, 로그인·세션·비밀번호·프로필 HTTP API |
-| backend/app/api/dependencies.py | 세션 인증·CSRF 검증 |
-| backend/app/services | 업무 규칙. 예약·캘린더 서비스의 미구현 메서드는 팀 상태 그대로 유지 |
-| backend/app/models | 회원·회의실·예약·참석자·알림 및 세션·로그인 제한·재설정 모델 |
-| backend/app/schemas | 요청·응답 형식 |
-| backend/app/core, db | 설정·보안 도구·DB 연결 |
-| frontend/src/main.tsx | 실제 React 실행 시작 |
-| frontend/src/App.tsx | 화면 경로와 레이아웃 연결 |
-| frontend/src/auth | AuthProvider와 ProtectedRoute |
-| frontend/src/layouts/AuthLayout.tsx | 로그인·회원가입·비밀번호 재설정 공통 틀 |
-| frontend/src/components/AppLayout.tsx | 팀 공통 메뉴·본문 및 실제 서버 로그아웃 |
-| frontend/src/pages | 팀 reservation/calendar/admin 화면과 인증·프로필 화면 |
-| frontend/src/shared | 서버 통신·타입·공통 React hooks |
-| frontend/src/mocks | 팀이 만든 임시 데이터, 로그인 PR에서 API로 교체하지 않음 |
+| api/routes | HTTP 입력을 받고 서비스를 호출한 뒤 응답한다. |
+| schemas | 요청·응답 데이터의 형식과 검증 조건을 정의한다. |
+| services | 업무 규칙을 처리하고 DB 조회·저장을 수행한다. |
+| models | 네 테이블의 컬럼·관계·제약을 정의한다. |
+| core | 설정·보안 도구·공통 오류를 제공한다. |
+| db | DB 연결과 세션, 모델 기반을 제공한다. |
+| migrations | 실제 DB 스키마 변경 이력을 관리한다. |
 
-폴더 트리는 컴포넌트 중첩 관계와 다르다. main.tsx의 AuthProvider가 App을 감싸고, App의 Route가 AuthLayout 또는 ProtectedRoute → 팀 AppLayout을 선택한다. 각 레이아웃의 Outlet에 실제 페이지가 표시된다.
+`db/session.py`의 세션은 DB 작업 단위이며 로그인 기록 테이블을 뜻하지 않는다. `schemas/auth.py`와 `services/auth.py`도 별도 테이블을 뜻하지 않는다.
 
-초기 프런트의 빈 app/, main.ts, index.ts/templates.ts 뼈대는 developer에서 정리한 상태를 따른다. Python의 빈 __init__.py는 유지한다. 백엔드의 미구현 기능용 파일은 로그인 PR의 정리 대상으로 삭제하지 않는다.
+현재 단계에서는 빈 구현 파일만 배치한다. 인증 정책과 업무 규칙은 개발 단계에서 확정한다. 이메일 인증·별도 로그인 기록·예약 참석자 연결 테이블을 추가하는 구조로 확장하지 않는다.
+
+프런트엔드와 백엔드는 분리한다. 화면은 API를 호출하고 FastAPI가 PostgreSQL에 접근한다.

@@ -127,3 +127,26 @@ def test_invalid_login_bodies_count_ip_limit(client):
     for _ in range(30):
         assert client.post("/api/auth/login", json={}).status_code == 422
     assert signin(client).json()["detail"]["code"] == "IP_RATE_LIMITED"
+
+
+def test_login_selects_current_account_after_blocked_email_reregistration(client, seed):
+    old_id = seed(blocked=True)
+    current_id = seed()
+    with SessionLocal() as db:
+        from app.models import User
+
+        old = db.get(User, old_id)
+        old.password_hash = security.hash_password("Previous123!")
+        db.commit()
+    # A password from the blocked account cannot authenticate the new account.
+    assert signin(client, password="Previous123!").status_code == 401
+    response = signin(client)
+    assert response.status_code == 200
+    assert response.json()["user"]["user_id"] == str(current_id)
+
+
+def test_pending_reregistered_account_cannot_fall_back_to_blocked_account(client, seed):
+    seed(blocked=True)
+    seed(approved=False)
+    assert signin(client).json()["detail"]["code"] == "USER_PENDING"
+    assert not client.cookies.get("session")

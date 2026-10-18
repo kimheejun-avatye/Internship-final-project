@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import TeamLayout from "./components/AppLayout";
+import AppLayout from "./layouts/AppLayout";
 import AuthLayout from "./layouts/AuthLayout";
-import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import LoginPage from "./pages/auth/LoginPage";
 import SignupPage from "./pages/auth/SignupPage";
@@ -11,19 +12,20 @@ import CalendarPage from "./pages/calendar/CalendarPage";
 import AdminPage from "./pages/admin/AdminPage";
 export default function App() {
   return <Routes>
+    <Route path="/signup" element={<SignupPage />} />
     <Route element={<AuthLayout />}>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
       <Route path="/password/reset" element={<PasswordResetPage />} />
     </Route>
     <Route element={<ProtectedRoute />}>
-      <Route element={<AppLayout />}>
-        <Route path="/reservations" element={<ReservationPage />} />
-        <Route path="/calendar" element={<CalendarPage />} />
-        <Route path="/admin" element={<AdminPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-      </Route>
+      <Route element={<AppLayout />}><Route path="/profile" element={<ProfilePage />} /></Route>
     </Route>
-    <Route path="*" element={<Navigate to="/reservations" replace />} />
+    {/* Team routes and their layout are kept as-is; their authentication is a later integration task. */}
+    <Route element={<TeamLayout />}>
+      <Route path="/reservations" element={<ReservationPage />} />
+      <Route path="/calendar" element={<CalendarPage />} />
+      <Route path="/admin" element={<AdminPage />} />
+    </Route>
+    <Route path="*" element={<Navigate to="/login" replace />} />
   </Routes>;
 }

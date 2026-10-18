@@ -28,9 +28,7 @@ def _now() -> datetime:
 
 def require_company_ip(ip: str) -> None:
     if not settings.is_company_ip(ip):
-        raise ApiError(
-            403, "NOT_COMPANY_NETWORK", "회사 네트워크에서만 가입할 수 있습니다."
-        )
+        raise ApiError(403, "NOT_COMPANY_NETWORK", "회사 네트워크에서만 가입할 수 있습니다.")
 
 
 def _lock(db: Session, key: str) -> None:
@@ -50,29 +48,22 @@ def _window(db: Session, column, filters: list, window: timedelta, now: datetime
 
 
 def _active_user(db: Session, email: str) -> Optional[User]:
-    return db.scalars(select(User).where(User.email == email)).first()
+    return db.scalars(select(User).where(User.email == email, User.blocked_at.is_(None))).first()
 
 
 def check_email(db: Session, ip: str, email: str) -> str:
     require_company_ip(ip)
     now = _now()
     _lock(db, "check:" + ip)
-    count, oldest = _window(
-        db, SignupCheckLog.checked_at, [SignupCheckLog.ip == ip], HOUR, now
-    )
+    count, oldest = _window(db, SignupCheckLog.checked_at, [SignupCheckLog.ip == ip], HOUR, now)
     if count >= settings.ip_hourly_check_limit:
-        raise ApiError(
-            429,
-            "RATE_LIMIT_IP",
-            "요청이 너무 많습니다.",
-            _seconds_until(oldest + HOUR, now),
-        )
+        raise ApiError(429, "RATE_LIMIT_IP", "요청이 너무 많습니다.", _seconds_until(oldest + HOUR, now))
     db.add(SignupCheckLog(ip=ip))
     user = _active_user(db, email)
     db.commit()
     if user is None:
         return "AVAILABLE"
-    return "PENDING" if user.is_pending else "REGISTERED"
+    return "PENDING" if user.approved_at is None else "REGISTERED"
 
 
 def send_code(db: Session, ip: str, email: str):
@@ -83,70 +74,37 @@ def send_code(db: Session, ip: str, email: str):
     _lock(db, "send:global")  # IP·서비스 전체 한도 계산이 겹쳐서 초과되지 않게 한다
 
     if _active_user(db, email) is not None:
-        raise ApiError(
-            409, "EMAIL_ALREADY_EXISTS", "이미 가입했거나 승인 대기 중인 이메일입니다."
-        )
+        raise ApiError(409, "EMAIL_TAKEN", "이미 가입했거나 승인 대기 중인 이메일입니다.")
 
     row = db.get(EmailVerification, email)
     if row is not None and row.locked_until is not None and row.locked_until > now:
-        raise ApiError(
-            429,
-            "CODE_LOCKED",
-            "시도 횟수를 초과했습니다.",
-            _seconds_until(row.locked_until, now),
-        )
+        raise ApiError(429, "CODE_LOCKED", "시도 횟수를 초과했습니다.", _seconds_until(row.locked_until, now))
 
-    last_sent = db.scalar(
-        select(func.max(EmailSendLog.sent_at)).where(EmailSendLog.email == email)
-    )
+    last_sent = db.scalar(select(func.max(EmailSendLog.sent_at)).where(EmailSendLog.email == email))
     if last_sent is not None:
         cooldown_end = last_sent + timedelta(seconds=settings.resend_cooldown_seconds)
         if cooldown_end > now:
-            raise ApiError(
-                429,
-                "RESEND_COOLDOWN",
-                "잠시 후 다시 요청해 주세요.",
-                _seconds_until(cooldown_end, now),
-            )
+            raise ApiError(429, "RESEND_COOLDOWN", "잠시 후 다시 요청해 주세요.", _seconds_until(cooldown_end, now))
 
     # 서버 쪽 발송 실패는 이메일별 횟수에서 제외한다. IP·서비스 한도에는 모두 센다
     count, oldest = _window(
-        db,
-        EmailSendLog.sent_at,
-        [EmailSendLog.email == email, EmailSendLog.failed.is_(False)],
-        HOUR,
-        now,
+        db, EmailSendLog.sent_at, [EmailSendLog.email == email, EmailSendLog.failed.is_(False)], HOUR, now
     )
     if count >= settings.email_hourly_limit:
-        raise ApiError(
-            429,
-            "RATE_LIMIT_EMAIL",
-            "요청이 너무 많습니다.",
-            _seconds_until(oldest + HOUR, now),
-        )
+        raise ApiError(429, "RATE_LIMIT_EMAIL", "요청이 너무 많습니다.", _seconds_until(oldest + HOUR, now))
 
     for limit, window in (
         (settings.ip_hourly_send_limit, HOUR),
         (settings.ip_minute_send_limit, MINUTE),
     ):
-        count, oldest = _window(
-            db, EmailSendLog.sent_at, [EmailSendLog.ip == ip], window, now
-        )
+        count, oldest = _window(db, EmailSendLog.sent_at, [EmailSendLog.ip == ip], window, now)
         if count >= limit:
-            raise ApiError(
-                429,
-                "RATE_LIMIT_IP",
-                "요청이 너무 많습니다.",
-                _seconds_until(oldest + window, now),
-            )
+            raise ApiError(429, "RATE_LIMIT_IP", "요청이 너무 많습니다.", _seconds_until(oldest + window, now))
 
     count, oldest = _window(db, EmailSendLog.sent_at, [], DAY, now)
     if count >= settings.service_daily_send_limit:
         raise ApiError(
-            429,
-            "SERVICE_LIMIT",
-            "현재 인증 메일을 보낼 수 없습니다.",
-            _seconds_until(oldest + DAY, now),
+            429, "SERVICE_LIMIT", "현재 인증 메일을 보낼 수 없습니다.", _seconds_until(oldest + DAY, now)
         )
 
     code = security.new_code()
@@ -172,18 +130,8 @@ def verify_code(db: Session, ip: str, email: str, code: str) -> str:
     row = db.get(EmailVerification, email)
 
     if row is not None and row.locked_until is not None and row.locked_until > now:
-        raise ApiError(
-            429,
-            "CODE_LOCKED",
-            "시도 횟수를 초과했습니다.",
-            _seconds_until(row.locked_until, now),
-        )
-    if (
-        row is None
-        or row.code_hash is None
-        or row.code_expires_at is None
-        or row.code_expires_at <= now
-    ):
+        raise ApiError(429, "CODE_LOCKED", "시도 횟수를 초과했습니다.", _seconds_until(row.locked_until, now))
+    if row is None or row.code_hash is None or row.code_expires_at is None or row.code_expires_at <= now:
         raise ApiError(400, "CODE_EXPIRED", "코드가 만료되었습니다. 재전송해 주세요.")
 
     if not security.same(row.code_hash, security.digest("code", email, code)):
@@ -194,25 +142,16 @@ def verify_code(db: Session, ip: str, email: str, code: str) -> str:
             row.code_hash = None
             row.failed_count = 0
             db.commit()
-            raise ApiError(
-                429, "CODE_LOCKED", "시도 횟수를 초과했습니다.", settings.lock_seconds
-            )
+            raise ApiError(429, "CODE_LOCKED", "시도 횟수를 초과했습니다.", settings.lock_seconds)
         remaining = settings.max_failed_attempts - row.failed_count
         db.commit()
-        raise ApiError(
-            400,
-            "CODE_MISMATCH",
-            "인증번호가 올바르지 않습니다.",
-            remaining_attempts=remaining,
-        )
+        raise ApiError(400, "CODE_MISMATCH", "인증번호가 올바르지 않습니다.", remaining_attempts=remaining)
 
     token = security.new_signup_token()
     row.code_hash = None  # 일회용
     row.failed_count = 0
     row.signup_token_hash = security.digest("token", email, token)
-    row.signup_token_expires_at = now + timedelta(
-        seconds=settings.signup_token_ttl_seconds
-    )
+    row.signup_token_expires_at = now + timedelta(seconds=settings.signup_token_ttl_seconds)
     db.commit()
     return token
 
@@ -222,25 +161,15 @@ def signup(db: Session, ip: str, data: SignupIn) -> User:
     now = _now()
     password_hash = security.hash_password(data.password)  # 무거운 계산은 잠금 밖에서
     _lock(db, "email:" + data.email)
-    now = (
-        _now()
-    )  # Recheck expiry after hashing and waiting for concurrent signup requests.
     row = db.get(EmailVerification, data.email)
     if (
         row is None
         or row.signup_token_hash is None
         or row.signup_token_expires_at is None
         or row.signup_token_expires_at <= now
-        or not security.same(
-            row.signup_token_hash,
-            security.digest("token", data.email, data.signup_token),
-        )
+        or not security.same(row.signup_token_hash, security.digest("token", data.email, data.signup_token))
     ):
-        raise ApiError(
-            400,
-            "INVALID_TOKEN",
-            "이메일 인증이 필요합니다. 인증번호부터 다시 받아 주세요.",
-        )
+        raise ApiError(400, "INVALID_TOKEN", "이메일 인증이 필요합니다. 인증번호부터 다시 받아 주세요.")
 
     user = User(
         email=data.email,
@@ -255,13 +184,7 @@ def signup(db: Session, ip: str, data: SignupIn) -> User:
     row.signup_token_expires_at = None
     try:
         db.commit()
-    except IntegrityError as exc:
+    except IntegrityError:
         db.rollback()
-        if getattr(getattr(exc.orig, "diag", None), "constraint_name", None) not in {
-            "users_email_uniq",
-            "uq_users_email",
-            "users_email_active_uniq",
-        }:
-            raise
-        raise ApiError(409, "EMAIL_ALREADY_EXISTS", "이미 가입된 이메일입니다.")
+        raise ApiError(409, "EMAIL_TAKEN", "이미 가입된 이메일입니다.")
     return user

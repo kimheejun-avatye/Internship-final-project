@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../../auth/AuthProvider";
 import ProtectedRoute from "../../auth/ProtectedRoute";
 import LoginPage from "./LoginPage";
-import { request, setCsrfToken } from "../../shared/api/client";
+import { request, setCsrfToken } from "../../shared/api/session-client";
 import PasswordChangeForm from "../profile/PasswordChangeForm";
 
 const session = { user: { user_id: "u1", email: "member@example.com", name: "회원", team: "AVATYE", role: "MEMBER" }, csrf_token: "csrf-value", idle_expires_at: new Date(Date.now()+1800000).toISOString(), absolute_expires_at: new Date(Date.now()+28800000).toISOString() };

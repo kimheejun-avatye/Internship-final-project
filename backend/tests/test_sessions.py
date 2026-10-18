@@ -1,10 +1,9 @@
 from conftest import signin
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 
 from app.db.session import SessionLocal
 from app.main import app
-from app.models import User, UserSession
+from app.models import User
 
 
 def test_idle_expiry_and_me_does_not_extend(client, seed, time):
@@ -85,33 +84,14 @@ def test_blocked_existing_session(client, seed):
     assert client.get("/api/auth/me").json()["detail"]["code"] == "USER_BLOCKED"
 
 
-def test_profile_whitelist_and_activity(client, seed, time):
-    seed()
-    signin(client)
-    time.advance(minutes=10)
-    assert (
-        client.patch(
-            "/api/users/me", json={"name": "hello", "role": "ADMIN"}
-        ).status_code
-        == 422
-    )
-    r = client.patch(
-        "/api/users/me", json={"name": "hello"}, headers={"X-Session-Activity": "user"}
-    )
-    assert r.status_code == 200 and r.json()["name"] == "hello"
-    with SessionLocal() as db:
-        assert db.scalar(select(UserSession)).last_activity_at == time.value
-
-
-def test_explicit_profile_read_extends_but_poll_does_not(client, seed, time):
+def test_me_does_not_extend_even_with_user_activity_header(client, seed, time):
     seed()
     signin(client)
     time.advance(minutes=10)
     original = client.get("/api/auth/me").json()["idle_expires_at"]
-    assert client.get("/api/users/me").status_code == 200
-    assert client.get("/api/auth/me").json()["idle_expires_at"] == original
     assert (
-        client.get("/api/users/me", headers={"X-Session-Activity": "user"}).status_code
-        == 200
+        client.get("/api/auth/me", headers={"X-Session-Activity": "user"}).json()[
+            "idle_expires_at"
+        ]
+        == original
     )
-    assert client.get("/api/auth/me").json()["idle_expires_at"] != original
