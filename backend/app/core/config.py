@@ -16,6 +16,16 @@ def _int(name: str, default: int) -> int:
 
 class Settings:
     def __init__(self) -> None:
+        self.production = os.environ.get("APP_ENV") == "production"
+        self.origins = set(
+            os.environ.get(
+                "APP_ORIGINS",
+                "http://127.0.0.1:5174,http://localhost:5174,http://127.0.0.1:5173,http://localhost:5173",
+            ).split(",")
+        )
+        self.cookie_name = "__Host-session" if self.production else "session"
+        self.session_idle_seconds = 1800
+        self.session_absolute_seconds = 28800
         self.secret_key = os.environ.get("SECRET_KEY", "")
         self.company_ips = os.environ.get("COMPANY_IPS", "127.0.0.1,::1")
 
@@ -38,6 +48,8 @@ class Settings:
 
     @property
     def database_url(self) -> URL:
+        if os.environ.get("DATABASE_URL"):
+            return os.environ["DATABASE_URL"]
         return URL.create(
             "postgresql+psycopg",
             username=os.environ["POSTGRES_USER"],
