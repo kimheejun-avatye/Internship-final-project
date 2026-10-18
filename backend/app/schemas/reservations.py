@@ -1,7 +1,7 @@
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
 
 # 캘린더 예약 조회 요청: 일·주·월 조회에서 공통으로 사용하는 기간과 필터
@@ -19,3 +19,27 @@ class CalendarQuery(BaseModel):
         if self.end_at <= self.start_at:
             raise ValueError("조회 종료 시각은 시작 시각보다 늦어야 합니다.")
         return self
+
+
+# 캘린더 예약 조회 응답: 날짜·주간·월간 목록에서 공통으로 반환하는 예약 한 건
+class CalendarReservationResponse(BaseModel):
+    """목록 API는 페이지 정보 없이 list[CalendarReservationResponse]를 반환한다.
+
+    회의실 이름과 참석 정보는 서비스에서 조회·계산해 구성한다.
+    Reservation ORM을 그대로 직렬화하는 DTO가 아니다.
+    """
+
+    reservation_id: UUID
+    title: str
+    room_id: UUID
+    room_name: str
+    organizer_id: UUID = Field(description="예약 생성자: Reservation.user_id")
+    start_at: AwareDatetime
+    end_at: AwareDatetime
+    participant_count: int = Field(
+        ge=0, description="reservation_attendees 기준 참석 인원수"
+    )
+    is_mine: bool = Field(description="예약 생성자가 로그인 사용자와 같은지 여부")
+    is_attending: bool = Field(
+        description="로그인 사용자가 reservation_attendees에 등록되어 있는지 여부"
+    )
