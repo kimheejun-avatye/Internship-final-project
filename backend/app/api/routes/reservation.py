@@ -1,10 +1,14 @@
 """예약·캘린더 컨트롤러. 클래스 선언은 HTTP 경로를 등록하지 않는다."""
 
 from typing import Any
-from uuid import UUID
 
 from app.models.users import User
-from app.schemas.reservations import CalendarQuery, CalendarReservationResponse
+from app.schemas.reservations import (
+    CalendarQuery,
+    CalendarReservationResponse,
+    ReservationListQuery,
+    ReservationListOut,
+)
 from app.schemas.rooms import RoomOut
 from app.services.reservations import ReservationService
 
@@ -52,17 +56,18 @@ class ReservationController:
         """
         raise NotImplementedError
 
-    # 내 금일 예약 조회: 인증 사용자 ID·선택 회의실·페이지 번호를 서비스에 전달한다.
+    # 예약 화면의 회의실별 금일 예약 조회
     def get_my_today_reservations(
-        self, room_id: UUID, current_user: User, page: int = 1
-    ) -> Any:
-        """제안: GET /reservations/my/today. 내 금일 예약의 페이지 응답.
+        self,
+        query: ReservationListQuery,
+        current_user: User,
+    ) -> ReservationListOut:
+        """예약자 구분 없이 오늘 남은 예약을 페이지로 조회한다.
 
-        요청 계약: room_id, page(1 이상). 응답 계약: items, total, page, page_size=5.
-        TODO: 페이지 요청/응답 DTO가 정의되면 Any 응답 타입을 교체하고 검증 연결.
-        TODO: 인증된 current_user.user_id, room_id, page만
-        service.get_my_today_reservations에 전달한다.
-        사용자 ID는 클라이언트 입력으로 받지 않는다. 날짜·scope·page_size도
-        클라이언트 옵션으로 제공하지 않고 서비스가 결정한다.
+        사용자 인증은 HTTP 계층에서 연결하며, 전달받은 User를 사용한다.
         """
-        raise NotImplementedError
+        return self.service.get_my_today_reservations(
+            user_id=current_user.user_id,
+            room_id=query.room_id,
+            page=query.page,
+        )
