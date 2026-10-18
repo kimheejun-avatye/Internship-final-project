@@ -1,6 +1,4 @@
-import { useState } from "react";
-import { useAuth } from "../auth/AuthProvider";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import Logo from "./Logo";
 
@@ -8,19 +6,10 @@ const MENU = [
   { to: "/reservations", label: "예약하기" },
   { to: "/calendar", label: "캘린더" },
   { to: "/admin", label: "관리자" },
-  { to: "/profile", label: "비밀번호 변경" },
 ];
 
 export default function AppLayout() {
-  const { logout } = useAuth();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  async function exit() {
-    setBusy(true); setError("");
-    try { await logout(); }
-    catch (e) { setError(e instanceof Error ? e.message : "로그아웃에 실패했습니다."); }
-    finally { setBusy(false); }
-  }
+  const navigate = useNavigate();
 
   return (
     <div className="app">
@@ -36,8 +25,8 @@ export default function AppLayout() {
               </NavLink>
             ))}
           </nav>
-          {error && <p role="alert">{error}</p>}
-          <button type="button" className="logout" disabled={busy} onClick={() => void exit()}>
+          {/* 로그인/세션 처리는 로그인 담당 작업에서 연결한다 */}
+          <button type="button" className="logout" onClick={() => navigate("/login")}>
             로그아웃
           </button>
         </aside>

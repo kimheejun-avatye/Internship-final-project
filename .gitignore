@@ -17,7 +17,6 @@ venv/
 htmlcov/
 
 # Frontend
-node_modules
 node_modules/
 dist/
 coverage/

@@ -1,12 +1,11 @@
 import react from "@vitejs/plugin-react";
-import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, ".", "");
-  return {
-    plugins: [react()],
-    test: { environment: "jsdom", globals: true, setupFiles: "./src/test/setup.ts" },
-    server: { proxy: { "/api": env.BACKEND_URL || "http://127.0.0.1:8000" } },
-  };
+export default defineConfig({
+  plugins: [react()],
+  test: { environment: "jsdom", globals: true, setupFiles: "./src/test/setup.ts" },
+  server: {
+    // 개발 중에는 /api 요청을 FastAPI(uvicorn 기본 포트)로 넘긴다
+    proxy: { "/api": "http://127.0.0.1:8000" },
+  },
 });

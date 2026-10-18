@@ -1,108 +1,68 @@
 import os
-from datetime import datetime, timezone
 from pathlib import Path
 
-import pytest
-from sqlalchemy import text
-from sqlalchemy.engine import make_url
+from dotenv import load_dotenv
 
-url = os.environ.get("TEST_DATABASE_URL")
-if not url or not make_url(url).database.endswith("_test"):
-    raise RuntimeError(
-        "Set TEST_DATABASE_URL to a dedicated PostgreSQL database ending in _test"
-    )
-os.environ["DATABASE_URL"] = url
-# The team reservation tests assert the configured test DB name.
-os.environ["POSTGRES_DB"] = make_url(url).database
-os.environ["SECRET_KEY"] = "test-secret-only-not-for-production-1234567890"
-# Tests must not inherit a developer-specific browser port from .env.
-os.environ["APP_ORIGINS"] = "http://127.0.0.1:5174"
-os.environ["APP_ENV"] = "development"
-from alembic import command
-from alembic.config import Config
-from fastapi.testclient import TestClient
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+os.environ.setdefault("SECRET_KEY", "test-secret")
+# 개발 DB 를 건드리지 않도록 별도 DB 를 쓴다. app 을 import 하기 전에 바꿔야 한다
+TEST_DB = os.environ["POSTGRES_DB"] + "_test"
 
-from app.core.security import hash_password
-from app.db.session import SessionLocal
-from app.main import app
-from app.models import Team, User
-from app.services import clock
+import psycopg  # noqa: E402
 
-PASSWORD = "Example123!"
+with psycopg.connect(
+    dbname="postgres",
+    user=os.environ["POSTGRES_USER"],
+    password=os.environ["POSTGRES_PASSWORD"],
+    host="127.0.0.1",
+    port=os.environ["POSTGRES_PORT"],
+    autocommit=True,
+) as conn:
+    if not conn.execute("SELECT 1 FROM pg_database WHERE datname = %s", (TEST_DB,)).fetchone():
+        conn.execute(f'CREATE DATABASE "{TEST_DB}"')
+os.environ["POSTGRES_DB"] = TEST_DB
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import text  # noqa: E402
+
+from app.db.base import Base  # noqa: E402
+from app.db.session import engine  # noqa: E402
+from app.main import app  # noqa: E402
+import app.models as _models  # noqa: E402,F401
+from app.models.reservations import Reservation  # noqa: E402,F401
+from app.models.reservation_attendee import ReservationAttendee  # noqa: E402,F401
+from app.services import mailer  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)
-def migrated():
-    cfg = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
-    command.upgrade(cfg, "head")
+def schema():
+    if engine.url.database != TEST_DB or not TEST_DB.endswith("_test"):
+        raise RuntimeError("Refusing to reset non-test database")
+
+    with engine.begin() as c:
+        c.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public"))
+    Base.metadata.create_all(engine)
 
 
 @pytest.fixture(autouse=True)
-def clean_db(migrated):
-    with SessionLocal() as db:
-        db.execute(
-            text(
-                "TRUNCATE rooms, users, email_verifications, email_send_log, signup_check_log, login_failures, login_locks, login_ip_requests, password_reset_verifications CASCADE"
-            )
-        )
-        db.commit()
-
-
-@pytest.fixture
-def client():
-    with TestClient(
-        app, client=("127.0.0.1", 50000), headers={"Origin": "http://127.0.0.1:5174"}
-    ) as c:
-        yield c
-
-
-@pytest.fixture
-def seed():
-    def create(email="member@example.com", approved=True, blocked=False):
-        with SessionLocal() as db:
-            user = User(
-                email=email,
-                name="테스트",
-                password_hash=hash_password(PASSWORD),
-                team=Team.AVATYE,
-                approved_at=clock.now() if approved else None,
-                blocked_at=clock.now() if blocked else None,
-            )
-            db.add(user)
-            db.commit()
-            return user.user_id
-
-    return create
-
-
-@pytest.fixture
-def time(monkeypatch):
-    class Time:
-        value = datetime(2026, 10, 18, 0, 0, tzinfo=timezone.utc)
-
-        def advance(self, **kwargs):
-            from datetime import timedelta
-
-            self.value += timedelta(**kwargs)
-
-    value = Time()
-    monkeypatch.setattr(clock, "now", lambda: value.value)
-    return value
-
-
-def signin(client, email="member@example.com", password=PASSWORD):
-    r = client.post("/api/auth/login", json={"email": email, "password": password})
-    if r.status_code == 200:
-        client.headers["X-CSRF-Token"] = r.json()["csrf_token"]
-    return r
+def clean():
+    yield
+    with engine.begin() as c:
+        c.execute(text(
+            "TRUNCATE reservation_attendees, reservations, rooms, users, email_verifications, "
+            "email_send_log, signup_check_log"
+        ))
 
 
 @pytest.fixture
 def mails(monkeypatch):
-    from app.services import mailer
+    sent = []
+    monkeypatch.setattr(mailer, "send_email", lambda to, subject, body: sent.append((to, body)))
+    monkeypatch.setattr(mailer.time, "sleep", lambda s: None)
+    return sent
 
-    messages = []
-    monkeypatch.setattr(
-        mailer, "send_email", lambda to, subject, body: messages.append((to, body))
-    )
-    return messages
+
+@pytest.fixture
+def client():
+    return TestClient(app, client=("127.0.0.1", 50000))
