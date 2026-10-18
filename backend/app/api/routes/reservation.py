@@ -1,9 +1,10 @@
-"""예약·캘린더 컨트롤러 스켈레톤. 클래스 선언은 HTTP 경로를 등록하지 않는다."""
+"""예약·캘린더 컨트롤러. 클래스 선언은 HTTP 경로를 등록하지 않는다."""
 
 from typing import Any
 from uuid import UUID
 
 from app.models.users import User
+from app.schemas.reservations import CalendarQuery, CalendarReservationResponse
 from app.schemas.rooms import RoomOut
 from app.services.reservations import ReservationService
 
@@ -17,18 +18,23 @@ class ReservationController:
         self.service = service
 
     # 캘린더 예약 조회: 조회 기간·필터와 인증 사용자 ID를 서비스에 전달한다.
-    def get_calendar_reservations(self, query: Any, current_user: User) -> list[Any]:
+    def get_calendar_reservations(
+        self, query: CalendarQuery, current_user: User
+    ) -> list[CalendarReservationResponse]:
         """제안: GET /calendar/reservations. 일·주·월 조회는 기간만 다르게 받는다.
 
-        TODO: 없는 CalendarQuery 및 CalendarReservationResponse 정의 후 Any를
-        각각 해당 DTO와 list[CalendarReservationResponse]로 교체한다.
+        반환: list[CalendarReservationResponse].
         요청 계약: 시간대가 있는 start_at/end_at, scope(all/mine), 선택적 room_id.
-        TODO: DTO에서 end_at > start_at 검증. 응답 계약은 서비스 주석 참조.
-        TODO: 인증 의존성이 제공한 current_user.user_id와 query를
-        service.get_calendar_reservations에 전달하고 DTO 리스트를 반환한다.
+        DTO에서 시간대와 end_at > start_at을 검증한다. 응답 계약은 서비스 주석 참조.
+        current_user는 인증된 사용자 객체를 전달받는 계약이다.
+        해당 사용자의 user_id와 query를 서비스에 전달하고 결과를 그대로 반환한다.
+        TODO: HTTP 라우터 등록 시 로그인 인증 의존성을 연결한다.
         컨트롤러에서는 쿼리·날짜·업무 조건을 계산하지 않는다.
         """
-        raise NotImplementedError
+        return self.service.get_calendar_reservations(
+            user_id=current_user.user_id,
+            query=query,
+        )
 
     # 회의실 목록 조회
     def get_calendar_rooms(self, current_user: User) -> list[RoomOut]:
