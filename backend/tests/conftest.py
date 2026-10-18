@@ -12,7 +12,12 @@ if not url or not make_url(url).database.endswith("_test"):
         "Set TEST_DATABASE_URL to a dedicated PostgreSQL database ending in _test"
     )
 os.environ["DATABASE_URL"] = url
+# The team reservation tests assert the configured test DB name.
+os.environ["POSTGRES_DB"] = make_url(url).database
 os.environ["SECRET_KEY"] = "test-secret-only-not-for-production-1234567890"
+# Tests must not inherit a developer-specific browser port from .env.
+os.environ["APP_ORIGINS"] = "http://127.0.0.1:5174"
+os.environ["APP_ENV"] = "development"
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient

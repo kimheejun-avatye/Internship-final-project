@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Logo from "../../components/Logo";
 import { useAuth } from "../../auth/AuthProvider";
 import { ApiError } from "../../shared/api/client";
@@ -7,7 +7,6 @@ import { ApiError } from "../../shared/api/client";
 export default function LoginPage() {
   const { login, notice } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -17,8 +16,7 @@ export default function LoginPage() {
     setBusy(true); setError("");
     try {
       await login(email.trim().toLowerCase(), password);
-      const from = location.state?.from;
-      navigate(typeof from === "string" && from.startsWith("/") && !from.startsWith("//") && !/^\/(login|signup|password)(\/|$|\?)/.test(from) ? from : "/profile", { replace: true });
+      navigate("/calendar", { replace: true });
     } catch (e) {
       const wait = e instanceof ApiError && e.extra.retryAfter ? ` ${Math.ceil(e.extra.retryAfter / 60)}분 후 다시 시도해주세요.` : "";
       setError((e instanceof Error ? e.message : "로그인에 실패했습니다.") + wait);

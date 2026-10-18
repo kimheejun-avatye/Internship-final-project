@@ -11,7 +11,7 @@ Python 3.10 이상, uv, PostgreSQL, 프런트 package.json의 Node engines에 �
 루트 .env.example을 .env로 복사하고 PostgreSQL 값과 32자 이상 무작위 SECRET_KEY를 설정한다. .env는 Git에 올리지 않는다. frontend/.env.local에 BACKEND_URL=http://127.0.0.1:8001을 지정하면 아래 포트와 연결된다.
 
 ```bash
-# 새 DB 또는 회원가입 0002 DB 기준
+# 새 DB 또는 기존 로그인/팀 DB 기준 (백업 후 적용)
 cd backend
 uv sync
 uv run alembic upgrade head
@@ -24,7 +24,7 @@ npm ci
 npm run dev -- --host 127.0.0.1 --port 5174
 ```
 
-/login은 로그인, /password/reset은 비밀번호 찾기, /profile은 로그인 후 현재 계정 표시와 비밀번호 변경 화면이다. /signup은 기존 담당자 화면을 그대로 사용한다. 예약·캘린더·관리자 화면과 라우팅은 포함하지 않는다.
+/login은 로그인, /password/reset은 비밀번호 찾기, /profile은 비밀번호 변경 화면이다. 로그인 성공과 기존 로그인 복원 후 기본 이동은 /calendar다. /signup은 기존 담당자 화면을 그대로 사용한다. 최신 developer의 예약·캘린더·관리자 화면은 ProtectedRoute와 팀 AppLayout 아래에 연결했다. 팀 화면의 임시 데이터는 유지한다.
 
 회원가입은 기존대로 승인 대기 계정을 만든다. 승인 기능은 담당자가 처리하며 로그인 코드는 approved_at·blocked_at 결과만 읽는다. 승인 CLI나 이름 수정 API는 이번 범위에 없다.
 
@@ -40,7 +40,7 @@ SMTP 미설정 개발 환경에서는 재설정 코드가 서버 로그에 출�
 
 ## DB 이력 주의
 
-login_0003은 인증 전용 테이블만 추가한다. 기존 0001·회원가입 0002 및 users 인덱스는 변경하지 않는다.
+login_0003은 인증 전용 테이블만 추가한다. 팀 캘린더 0003과 연결하는 merge_0004를 추가했으며 기존 revision과 users 인덱스는 변경하지 않는다. 단일 head로 합쳐지지만 기존 개발 DB에는 자동 적용하지 않았다.
 
 이전에 로그인 전용 0003 또는 이메일 전체 UNIQUE를 적용한 로컬 DB는 팀의 같은 번호 DB와 구조가 다를 수 있다. 이 DB에 즉시 upgrade를 실행하거나 stamp하지 않는다. 백업과 실제 테이블·인덱스 확인 후 별도 전환해야 하며 이번 작업에서 기존 개발 DB를 변경하지 않았다.
 
@@ -49,3 +49,5 @@ login_0003은 인증 전용 테이블만 추가한다. 기존 0001·회원가입
 이름이 _test로 끝나는 별도 PostgreSQL DB를 TEST_DATABASE_URL로 지정한 후 백엔드에서 pytest -q를 실행한다. 테스트가 해당 DB 데이터를 초기화하므로 개발 DB를 지정하지 않는다. 프런트는 npm test와 npm run build를 실행한다.
 
 세션은 비활동 30분·절대 8시간, 일반 로그아웃은 현재 세션만, 비밀번호 변경·찾기 완료는 해당 계정 전체 세션 폐기다. 자동 me 조회는 연장하지 않는다. HttpOnly 쿠키·Origin/JSON·CSRF 및 단계별 요청 제한은 내 인증 API에만 적용된다.
+
+로컬 화면은 현재 5175, 백엔드는 8002에서 실행한다. frontend/.env.local의 BACKEND_URL과 루트 .env의 APP_ORIGINS가 실제 접속 주소와 맞아야 한다. 테스트는 별도 DB를 사용한다.
