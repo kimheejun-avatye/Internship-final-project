@@ -87,3 +87,15 @@ it("keeps the selected room and page while StrictMode restores the session", asy
   expect(await screen.findByRole("heading", { name: "회의실 B - 오늘의 일정" })).toBeInTheDocument();
   expect(fetch).toHaveBeenCalledWith("/api/rooms/room-b/reservations?page=2", expect.anything());
 });
+
+
+it.each([
+  ["USER_BLOCKED", "차단된 계정입니다."],
+  ["USER_PENDING", "관리자 승인 대기 중입니다."],
+])("finishes session loading after an authentication loss response: %s", async (code, message) => {
+  vi.stubGlobal("fetch", vi.fn(async () => json({ detail: { code, message } }, 403)));
+  render(<StrictMode><MemoryRouter initialEntries={["/reservations"]}><AuthProvider><App /></AuthProvider></MemoryRouter></StrictMode>);
+  expect(await screen.findByRole("button", { name: "로그인" })).toBeInTheDocument();
+  expect(screen.queryByText("로그인 상태를 확인하고 있습니다.")).not.toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent(message);
+});

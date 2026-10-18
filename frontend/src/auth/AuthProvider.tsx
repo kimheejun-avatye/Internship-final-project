@@ -21,7 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hadSession = useRef(false);
   const channel = useRef<BroadcastChannel | null>(null);
   const accept = useCallback((data: SessionInfo) => { hadSession.current = true; setCsrfToken(data.csrf_token); setSession(data); setError(""); setNotice(""); }, []);
-  const clearLocal = useCallback((message = "") => { generation.current++; hadSession.current = false; setCsrfToken(""); setSession(null); setNotice(message); setError(""); }, []);
+  const clearLocal = useCallback((message = "") => { generation.current++; hadSession.current = false; setCsrfToken(""); setSession(null); setLoading(false); setNotice(message); setError(""); }, []);
   const clear = useCallback((message = "") => { clearLocal(message); channel.current?.postMessage("changed"); }, [clearLocal]);
   const reloadMe = useCallback(async () => {
     const id = ++generation.current;
