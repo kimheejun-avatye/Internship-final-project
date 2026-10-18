@@ -1,6 +1,6 @@
 # 회의실 예약 프로젝트
 
-백엔드는 FastAPI, DB는 PostgreSQL을 사용하며 Supabase는 사용하지 않는다. 애플리케이션은 개발 전 폴더 구조를 정리한 상태이며, 로컬 PostgreSQL 실행 설정은 준비되어 있다.
+백엔드는 FastAPI, DB는 PostgreSQL을 사용하며 Supabase는 사용하지 않는다. 회원가입과 세션 로그인 및 비밀번호 변경·재설정이 구현되어 있으며, 실행·검증 방법은 아래 로그인 개발 안내를 따른다.
 
 ## 로컬 PostgreSQL 실행
 
@@ -110,3 +110,7 @@ Python 패키지의 `__init__.py`는 트리에서 생략했다. 프런트엔드�
 각 화면의 `templates.ts`는 화면 마크업, `index.ts`는 이벤트와 화면 동작을 담당하도록 구성한다.
 
 [구조 설명](docs/design/architecture.md) · [DB 대응표](docs/design/database.md)
+
+## 로그인 개발
+
+[로그인 구현 및 실행 안내](docs/design/login-implementation.md)에서 환경 설정, 세션 정책, API, 테스트, 회원 승인 방법을 확인한다.
