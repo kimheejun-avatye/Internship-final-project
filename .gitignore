@@ -4,6 +4,7 @@
 !.env.example
 
 # Python
+/requirements.txt
 __pycache__/
 *.py[cod]
 .venv/
