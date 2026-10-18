@@ -25,12 +25,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clear = useCallback((message = "") => { clearLocal(message); channel.current?.postMessage("changed"); }, [clearLocal]);
   const reloadMe = useCallback(async () => {
     const id = ++generation.current;
-    try { const data = await api.getMe(); if (id === generation.current) accept(data); }
+    try {
+      const data = await api.getMe();
+      if (id !== generation.current) return;
+      accept(data);
+    }
     catch (e) {
       if (id !== generation.current) return;
       if (e instanceof ApiError && (e.status === 401 || e.code === "USER_BLOCKED" || e.code === "USER_PENDING")) clearLocal(hadSession.current ? "로그인이 만료되었거나 종료되었습니다. 다시 로그인해주세요." : "");
       else setError(e instanceof Error ? e.message : "로그인 상태 확인에 실패했습니다.");
-    } finally { setLoading(false); }
+    }
+    setLoading(false);
   }, [accept, clearLocal]);
   useEffect(() => {
     void reloadMe();

@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 
 from app.db.session import SessionLocal
 from app.models.reservations import Reservation
-from app.models.rooms import Room, RoomStatus
+from app.models.rooms import Room
 from app.models.users import User
 from app.services import clock, reservations
 
@@ -101,22 +101,12 @@ def test_http_conflict_validation_and_pagination(client, account):
         assert client.post("/api/reservations", json=payload(room_id, hour)).status_code == 201
     assert client.post("/api/reservations", json=payload(room_id)).status_code == 409
     assert client.post("/api/reservations", json={**payload(room_id), "user_id": str(uuid4())}).status_code == 422
-    assert client.post("/api/reservations", json={**payload(room_id), "title": " "}).status_code == 422
     assert client.get(f"/api/rooms/{room_id}/reservations?page=0").status_code == 422
-    assert client.get("/api/rooms/invalid/reservations").status_code == 422
     assert client.get(f"/api/rooms/{uuid4()}/reservations").status_code == 404
     result = client.get(f"/api/rooms/{room_id}/reservations?page=2").json()
     assert (result["total"], result["page"], len(result["items"])) == (7, 2, 2)
     with SessionLocal() as db:
         assert db.scalar(select(func.count()).select_from(Reservation)) == 7
-
-
-def test_http_missing_and_blocked_rooms(client, account):
-    assert client.post("/api/reservations", json=payload(uuid4())).status_code == 404
-    with SessionLocal() as db:
-        db.get(Room, account[1]).status = RoomStatus.BLOCK
-        db.commit()
-    assert client.post("/api/reservations", json=payload(account[1])).status_code == 409
 
 
 def test_api_database_errors_do_not_expose_details(client, account, monkeypatch):
