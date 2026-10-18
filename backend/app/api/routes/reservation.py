@@ -1,6 +1,16 @@
-"""예약·캘린더 컨트롤러. 클래스 선언은 HTTP 경로를 등록하지 않는다."""
+"""예약 컨트롤러와 로그인 인증이 필요한 예약 HTTP API."""
 
 from typing import Any
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
+
+from app.api.dependencies import authenticated
+from app.core.exceptions import ApiError
+from app.db.session import get_db
+from app.models.rooms import Room
+from app.services.rooms import list_rooms
 
 from app.models.users import User
 from app.schemas.reservations import (
@@ -17,7 +27,7 @@ from app.services.reservations import ReservationService
 
 # 예약·캘린더의 요청과 인증 사용자 정보를 받아 서비스에 전달하는 컨트롤러
 class ReservationController:
-    """인증된 User를 외부에서 받는다. 인증과 FastAPI DI 연결은 아직 없다."""
+    """HTTP 계층에서 확인한 User와 요청 DTO를 서비스에 전달한다."""
 
     # 생성자: 예약 조회 업무를 위임할 서비스 객체를 외부에서 주입받는다.
     def __init__(self, service: ReservationService) -> None:
@@ -82,3 +92,40 @@ class ReservationController:
             room_id=query.room_id,
             page=query.page,
         )
+
+
+router = APIRouter(prefix="/api", tags=["reservations"])
+
+
+@router.get("/rooms", response_model=list[RoomOut])
+def get_reservation_rooms(
+    identity=Depends(authenticated, scope="function"),
+    db: Session = Depends(get_db),
+):
+    return list_rooms(db)
+
+
+@router.get("/rooms/{room_id}/reservations", response_model=ReservationListOut)
+def get_room_reservations(
+    room_id: UUID,
+    page: int = Query(default=1, ge=1),
+    identity=Depends(authenticated, scope="function"),
+    db: Session = Depends(get_db),
+):
+    if db.get(Room, room_id) is None:
+        raise ApiError(404, "ROOM_NOT_FOUND", "회의실을 찾을 수 없습니다.")
+    controller = ReservationController(ReservationService(db))
+    return controller.get_my_today_reservations(
+        query=ReservationListQuery(room_id=room_id, page=page),
+        current_user=identity[0],
+    )
+
+
+@router.post("/reservations", response_model=ReservationCreateOut, status_code=201)
+def create_reservation(
+    body: ReservationCreateIn,
+    identity=Depends(authenticated, scope="function"),
+    db: Session = Depends(get_db),
+):
+    controller = ReservationController(ReservationService(db))
+    return controller.create_reservation(data=body, current_user=identity[0])
