@@ -2,15 +2,23 @@
 
 from typing import Any
 from uuid import UUID
-
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from sqlalchemy import func, select
+
 from sqlalchemy.orm import Session
 
-from app.models.reservation_attendee import ReservationAttendee
+from app.schemas.rooms import RoomOut
 from app.models.reservations import Reservation
 from app.models.rooms import Room
-from app.schemas.reservations import CalendarQuery, CalendarReservationResponse
-from app.schemas.rooms import RoomOut
+from app.models.reservation_attendee import ReservationAttendee
+from app.models.users import User
+from app.schemas.reservations import (
+    CalendarQuery,
+    CalendarReservationResponse,
+    ReservationListOut,
+    ReservationOut,
+)
 
 
 # 예약·캘린더 조회 규칙과 참석자별 Slack 리마인더 처리를 담당하는 서비스
@@ -109,25 +117,125 @@ class ReservationService:
         """
         raise NotImplementedError
 
-    # 내 금일 예약 조회: 한국 시간 금일·본인 생성·선택 회의실 조건으로 5건씩 조회한다.
+    # 선택한 회의실의 오늘 남은 예약을 예약자 구분 없이 5건씩 조회한다.
     def get_my_today_reservations(
         self, user_id: UUID, room_id: UUID, page: int = 1
-    ) -> Any:
-        """인증된 사용자가 생성한, 선택 회의실의 한국 시간 금일 예약 조회.
+    ) -> ReservationListOut:
+        """한국 시간 오늘과 겹치며 아직 종료되지 않은 예약을 조회한다.
 
-        user_id는 인증된 사용자에서만 전달받는다. scope/기간/page_size 옵션은 없다.
-        응답 계약: items, total, page, page_size=5. TODO: 없는 페이지 응답 DTO 연결.
-        TODO: 현재 시각을 한 번 구해 Asia/Seoul 오늘 00:00~다음 날 00:00 계산.
-        TODO: 생성자 user_id와 room_id를 강제하고 금일 구간과의 겹침 조건 적용:
-        reservation.start_at < 다음 날 00:00 및 reservation.end_at > 오늘 00:00.
-        시간 제외 조건 원문: '조회 시각이 종료시각보다 앞서는 경우 조회하지 않음'.
-        해석: end_at <= 현재 시각인 예약만 반환한다.
-        TODO: 이 조건의 제품 의도 확인 필요. 임의로 반대로 해석하지 않는다.
-        TODO: page >= 1 검증, 서버 고정 page_size=5, offset=(page-1)*5 결정.
-        TODO: 동일한 필터로 total과 페이지 목록 조회. start_at, reservation_id
-        오름차순으로 안정적으로 정렬하고 페이지 정보를 포함한 응답 구성.
+        start_at < 내일 00:00, end_at > 오늘 00:00, end_at > 현재 시각을 적용한다.
+        user_id는 컨트롤러에서 전달받지만 현재 조회 필터에는 사용하지 않는다.
+        start_at, reservation_id 오름차순으로 정렬하며 페이지당 5건을 반환한다.
+        total은 같은 조건의 전체 개수이고, 범위를 벗어난 페이지는 items=[]이다.
         """
-        raise NotImplementedError
+        if page < 1:
+            raise ValueError("페이지 번호는 1 이상이어야 합니다.")
+        now = datetime.now(ZoneInfo("Asia/Seoul"))
+
+        today_start = now.replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0
+        )
+        tomorrow_start = today_start + timedelta(days=1)
+
+        statement = select(Reservation).where(
+            Reservation.room_id == room_id,
+            Reservation.start_at < tomorrow_start,
+            Reservation.end_at > today_start,
+            Reservation.end_at > now
+        )
+
+        # 조건에 맞는 예약이 총 몇 개인지 세는 조회문
+        count_statement = select(func.count()).select_from(
+            statement.subquery()
+        )
+
+        # 실제 db에 실행
+        total = self.db.scalar(count_statement)
+
+        # 페이지 위치 계산
+        page_size = 5
+        offset = (page - 1) * page_size
+
+        # 예약 정렬
+        page_statement = (
+            statement
+            .order_by(Reservation.start_at, Reservation.reservation_id)
+            .offset(offset)
+            .limit(page_size)
+        )
+        reservations = self.db.scalars(page_statement).all()     # 여러 객체 가져올 때는 scalar's'
+
+        if not reservations:
+            return ReservationListOut(
+                items=[],
+                total=total,
+                page=page,
+                page_size=page_size,
+            )
+        # 참석 인원수 조회
+        reservation_ids = [
+            reservation.reservation_id
+            for reservation in reservations
+        ]
+
+        attendee_statement = (
+            select(
+                ReservationAttendee.reservation_id,
+                func.count(ReservationAttendee.user_id),
+            )
+            .where(
+                ReservationAttendee.reservation_id.in_(reservation_ids)
+            )
+            .group_by(ReservationAttendee.reservation_id)
+        )
+        participant_counts = dict(
+            self.db.execute(attendee_statement).all()   # 두 값을 함께 받아야 하기 때문에 execute 사용
+        )
+
+        # 예약 생성자의 소속 조회
+        organizer_ids = [
+            reservation.user_id
+            for reservation in reservations
+        ]
+        team_statement = select(
+            User.user_id,
+            User.team,
+        ).where(
+            User.user_id.in_(organizer_ids)
+        )
+
+        teams = dict(
+            self.db.execute(team_statement).all()
+        )
+
+        # 응답 객체 구성
+        items = []
+
+        for reservation in reservations:
+            item = ReservationOut(
+                reservation_id=reservation.reservation_id,
+                room_id=reservation.room_id,
+                user_id=reservation.user_id,
+                title=reservation.title,
+                start_at=reservation.start_at,
+                end_at=reservation.end_at,
+                # 해당 예약의 참석 인원수를 찾고 없으면 0
+                participant_count=participant_counts.get(
+                    reservation.reservation_id, 0
+                ),
+                team=teams[reservation.user_id],
+            )
+            items.append(item)
+
+        return ReservationListOut(
+            items=items,
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
 
     # 리마인더 동기화: 예약 일정·참석자 변경에 맞춰 참석자별 알림과 예정 시각을 갱신한다.
     def sync_reservation_reminders(self, reservation_id: UUID) -> None:
