@@ -1,7 +1,11 @@
+import uuid
+from datetime import datetime
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+
+from app.models.users import Team
 
 
 # 캘린더 예약 조회 요청: 일·주·월 조회에서 공통으로 사용하는 기간과 필터
@@ -43,3 +47,29 @@ class CalendarReservationResponse(BaseModel):
     is_attending: bool = Field(
         description="로그인 사용자가 reservation_attendees에 등록되어 있는지 여부"
     )
+
+
+# 컨트롤러가 서비스에 전달할 조회 조건 데이터
+class ReservationListQuery(BaseModel):
+    room_id: uuid.UUID
+    page: int = Field(default=1, ge=1)
+
+# 예약 한 건의 응답
+class ReservationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    reservation_id: uuid.UUID
+    room_id: uuid.UUID
+    user_id: uuid.UUID
+    title: str
+    start_at: datetime
+    end_at: datetime
+    participant_count: int = Field(ge=0)
+    team: Team
+
+# 예약 목록과 페이지 정보
+class ReservationListOut(BaseModel):
+    items: list[ReservationOut]
+    total: int = Field(ge=0)
+    page: int = Field(ge=1)
+    page_size: int = 5
