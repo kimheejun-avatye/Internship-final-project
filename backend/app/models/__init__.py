@@ -4,3 +4,11 @@ from app.models.signup_check_log import SignupCheckLog
 from app.models.users import Role, Team, User
 
 __all__ = ["EmailSendLog", "EmailVerification", "Role", "SignupCheckLog", "Team", "User"]
+
+from app.models.login_attempts import LoginFailure, LoginIPRequest, LoginLock
+from app.models.password_reset_verifications import PasswordResetVerification
+from app.models.reservation_attendee import ReservationAttendee
+from app.models.reservations import Reservation
+from app.models.rooms import Room, RoomStatus
+from app.models.slack_reminder import SlackReminder
+from app.models.user_sessions import UserSession
