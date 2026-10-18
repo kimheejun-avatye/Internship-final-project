@@ -35,6 +35,9 @@ from app.services import mailer  # noqa: E402
 
 @pytest.fixture(scope="session", autouse=True)
 def schema():
+    if engine.url.database != TEST_DB or not TEST_DB.endswith("_test"):
+        raise RuntimeError("Refusing to reset non-test database")
+
     with engine.begin() as c:
         c.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public"))
     Base.metadata.create_all(engine)
@@ -44,7 +47,10 @@ def schema():
 def clean():
     yield
     with engine.begin() as c:
-        c.execute(text("TRUNCATE users, email_verifications, email_send_log, signup_check_log"))
+        c.execute(text(
+            "TRUNCATE rooms, users, email_verifications, "
+            "email_send_log, signup_check_log"
+        ))
 
 
 @pytest.fixture
